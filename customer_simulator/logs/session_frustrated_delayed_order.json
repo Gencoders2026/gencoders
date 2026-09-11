@@ -1,0 +1,30 @@
+[
+  {
+    "timestamp": "2026-09-08T05:37:25.383406",
+    "agent": "Hello! Welcome to customer support. How can I help you today?",
+    "customer": "Order #12345 was due on March 15th. Why the delay? Tell me a new delivery date or offer a refund.",
+    "emotion": "confused",
+    "intensity": 5
+  },
+  {
+    "timestamp": "2026-09-08T05:38:47.531203",
+    "agent": "I\u2019m sorry for the delay. I understand how frustrating this must be. Let me check your order status and provide you with the latest delivery date.",
+    "customer": "Fine. So what\u2019s the new delivery date? Or should I just start a refund request?",
+    "emotion": "confused",
+    "intensity": 4
+  },
+  {
+    "timestamp": "2026-09-08T05:39:26.548353",
+    "agent": "I understand your concern. Let me check the latest delivery status first. If the order cannot be delivered within the updated timeframe, I can help you with the refund process.",
+    "customer": "Fine. Just give me the new delivery date or I'll start my own refund. I\u2019m not waiting forever.",
+    "emotion": "calm",
+    "intensity": 3
+  },
+  {
+    "timestamp": "2026-09-08T05:39:43.029919",
+    "agent": "Thank you for your patience. I\u2019ll make sure we find the best solution for you.",
+    "customer": "You really think a vague \u201cbest solution\u201d is enough? I need a concrete delivery date now or a full refund, no more delays.",
+    "emotion": "calm",
+    "intensity": 3
+  }
+]

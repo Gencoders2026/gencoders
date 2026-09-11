@@ -1,0 +1,148 @@
+{
+  "meta": {
+    "session_id": "a81021b7",
+    "started_at": "2026-09-11T13:33:31.893428Z",
+    "ended_at": null,
+    "config": {
+      "persona": "confused",
+      "scenario": "payment_failure",
+      "initial_emotion": "frustrated",
+      "issue_severity": 7,
+      "patience_level": 5,
+      "expected_resolution": "partial_refund",
+      "use_llm": true
+    },
+    "final_emotion": null,
+    "turn_count": 11
+  },
+  "conversation": [
+    {
+      "turn": 1,
+      "timestamp": "2026-09-11T13:33:33.573638Z",
+      "role": "customer",
+      "message": "My payment of $29.99 / month for Premium Plan keeps declining even though I have funds. Please fix this.",
+      "emotion": {
+        "intensity": 6,
+        "label": "frustrated",
+        "history": [
+          "init → 6 (frustrated)"
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "timestamp": "2026-09-11T14:27:58.693935Z",
+      "role": "agent",
+      "message": "okay we will check",
+      "emotion": null
+    },
+    {
+      "turn": 3,
+      "timestamp": "2026-09-11T14:27:59.379442Z",
+      "role": "customer",
+      "message": "I already explained the problem. Can you please give me a clear next step and a timeline?",
+      "emotion": {
+        "intensity": 7,
+        "label": "angry",
+        "history": [
+          "init → 6 (frustrated)",
+          "frustrated(6) → angry(7) [Δ+1]"
+        ]
+      }
+    },
+    {
+      "turn": 4,
+      "timestamp": "2026-09-11T14:28:37.637127Z",
+      "role": "agent",
+      "message": "okay sir i will check your status and i will tell you the exact date",
+      "emotion": null
+    },
+    {
+      "turn": 5,
+      "timestamp": "2026-09-11T14:28:38.289916Z",
+      "role": "customer",
+      "message": "That doesn't help. I need this fixed immediately or I'm escalating to a manager.",
+      "emotion": {
+        "intensity": 8,
+        "label": "angry",
+        "history": [
+          "init → 6 (frustrated)",
+          "frustrated(6) → angry(7) [Δ+1]",
+          "angry(7) → angry(8) [Δ+1]"
+        ]
+      }
+    },
+    {
+      "turn": 6,
+      "timestamp": "2026-09-11T14:28:56.446848Z",
+      "role": "agent",
+      "message": "we will immediately tell now",
+      "emotion": null
+    },
+    {
+      "turn": 7,
+      "timestamp": "2026-09-11T14:28:57.028024Z",
+      "role": "customer",
+      "message": "That doesn't help. I need this fixed immediately or I'm escalating to a manager.",
+      "emotion": {
+        "intensity": 9,
+        "label": "furious",
+        "history": [
+          "init → 6 (frustrated)",
+          "frustrated(6) → angry(7) [Δ+1]",
+          "angry(7) → angry(8) [Δ+1]",
+          "angry(8) → furious(9) [Δ+1]"
+        ]
+      }
+    },
+    {
+      "turn": 8,
+      "timestamp": "2026-09-11T14:29:32.684932Z",
+      "role": "agent",
+      "message": "okay by today we will fix it",
+      "emotion": null
+    },
+    {
+      "turn": 9,
+      "timestamp": "2026-09-11T14:29:33.277944Z",
+      "role": "customer",
+      "message": "That doesn't help. I need this fixed immediately or I'm escalating to a manager.",
+      "emotion": {
+        "intensity": 10,
+        "label": "furious",
+        "history": [
+          "init → 6 (frustrated)",
+          "frustrated(6) → angry(7) [Δ+1]",
+          "angry(7) → angry(8) [Δ+1]",
+          "angry(8) → furious(9) [Δ+1]",
+          "furious(9) → furious(10) [Δ+1]"
+        ]
+      }
+    },
+    {
+      "turn": 10,
+      "timestamp": "2026-09-11T14:29:49.797108Z",
+      "role": "agent",
+      "message": "we fixed it",
+      "emotion": null
+    },
+    {
+      "turn": 11,
+      "timestamp": "2026-09-11T14:29:50.379440Z",
+      "role": "customer",
+      "message": "That doesn't help. I need this fixed immediately or I'm escalating to a manager.",
+      "emotion": {
+        "intensity": 10,
+        "label": "furious",
+        "history": [
+          "init → 6 (frustrated)",
+          "frustrated(6) → angry(7) [Δ+1]",
+          "angry(7) → angry(8) [Δ+1]",
+          "angry(8) → furious(9) [Δ+1]",
+          "furious(9) → furious(10) [Δ+1]",
+          "furious(9) → furious(10) [Δ+1]"
+        ]
+      }
+    }
+  ]
+}
