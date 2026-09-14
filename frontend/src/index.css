@@ -1,0 +1,331 @@
+/* =========================================================
+   SESSION CONFIGURATION PAGE
+========================================================= */
+
+.config-page {
+  min-height: 100vh;
+  background: #f5f7fb;
+}
+
+/* Header */
+
+.config-header {
+  background: white;
+  padding: 20px 50px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.config-header h2 {
+  margin: 0;
+  color: #2563eb;
+  font-size: 26px;
+}
+
+.config-header span {
+  display: block;
+  margin-top: 5px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.config-header button {
+  border: 1px solid #d1d5db;
+  background: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.config-header button:hover {
+  background: #f9fafb;
+}
+
+/* Main content */
+
+.config-content {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 45px 25px;
+}
+
+/* Page title */
+
+.config-title {
+  margin-bottom: 30px;
+}
+
+.config-title h1 {
+  margin: 0 0 10px;
+  font-size: 34px;
+  color: #111827;
+}
+
+.config-title p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 16px;
+}
+
+/* Configuration card */
+
+.config-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 35px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Form sections */
+
+.form-section {
+  padding-bottom: 30px;
+  margin-bottom: 30px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.form-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.form-section h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  color: #111827;
+}
+
+.form-section > p {
+  color: #6b7280;
+}
+
+/* Interaction modes */
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.mode-option {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 20px;
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.mode-option:hover {
+  border-color: #2563eb;
+  background: #f8fbff;
+}
+
+.mode-option.selected {
+  border: 2px solid #2563eb;
+  background: #eff6ff;
+}
+
+.mode-option input {
+  margin-top: 4px;
+  accent-color: #2563eb;
+}
+
+.mode-option strong {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 16px;
+  color: #111827;
+}
+
+.mode-option p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Customer configuration */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 22px;
+  margin-top: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.form-group select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: white;
+  font-size: 14px;
+  color: #111827;
+  outline: none;
+}
+
+.form-group select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Patience */
+
+.patience-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.patience-heading h2 {
+  margin-bottom: 6px;
+}
+
+.patience-heading p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.patience-heading strong {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 18px;
+}
+
+.patience-slider {
+  width: 100%;
+  margin-top: 25px;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+/* Error */
+
+.error-message {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 12px 15px;
+  border-radius: 8px;
+  margin-top: 20px;
+  font-size: 14px;
+}
+
+/* Actions */
+
+.config-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 25px;
+}
+
+.cancel-button {
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cancel-button:hover {
+  background: #f9fafb;
+}
+
+.primary-button {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 12px 22px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-button:hover {
+  background: #1d4ed8;
+}
+
+.primary-button:disabled,
+.cancel-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+
+@media (max-width: 800px) {
+  .mode-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .config-header {
+    padding: 20px 25px;
+  }
+
+  .config-content {
+    padding: 30px 15px;
+  }
+
+  .config-card {
+    padding: 25px;
+  }
+}
+
+@media (max-width: 500px) {
+  .config-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .config-actions {
+    flex-direction: column-reverse;
+  }
+
+  .config-actions button {
+    width: 100%;
+  }
+}
