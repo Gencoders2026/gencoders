@@ -1,0 +1,34 @@
+{
+  "meta": {
+    "session_id": "f48beb47",
+    "started_at": "2026-09-14T16:42:50.290639Z",
+    "ended_at": null,
+    "config": {
+      "persona": "frustrated",
+      "scenario": "refund_request",
+      "initial_emotion": "angry",
+      "issue_severity": 7,
+      "frustration_level": 5,
+      "expected_resolution": "full_refund",
+      "use_llm": true
+    },
+    "final_emotion": null,
+    "turn_count": 1
+  },
+  "conversation": [
+    {
+      "turn": 1,
+      "timestamp": "2026-09-14T16:42:51.839089Z",
+      "role": "customer",
+      "message": "I'm really frustrated with order ORD-78421. The Wireless Noise-Cancelling Headphones arrived damaged, and I need the $149.99 refunded. Can you please sort this out?",
+      "emotion": {
+        "intensity": 5,
+        "label": "frustrated",
+        "history": [
+          "init → 5 (frustrated)",
+          "force → 5 (frustrated) [selected frustration level]"
+        ]
+      }
+    }
+  ]
+}

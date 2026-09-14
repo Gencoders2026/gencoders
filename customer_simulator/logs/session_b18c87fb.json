@@ -1,0 +1,34 @@
+{
+  "meta": {
+    "session_id": "b18c87fb",
+    "started_at": "2026-09-14T16:28:22.464966Z",
+    "ended_at": null,
+    "config": {
+      "persona": "calm",
+      "scenario": "delayed_order",
+      "initial_emotion": "angry",
+      "issue_severity": 7,
+      "frustration_level": 5,
+      "expected_resolution": "full_refund",
+      "use_llm": true
+    },
+    "final_emotion": null,
+    "turn_count": 1
+  },
+  "conversation": [
+    {
+      "turn": 1,
+      "timestamp": "2026-09-14T16:28:23.734781Z",
+      "role": "customer",
+      "message": "Order ORD-39215 is already late. The tracking number 1Z999AA10123456784 hasn't updated in days, and I really need it this week. Can you give me a clear update?",
+      "emotion": {
+        "intensity": 5,
+        "label": "frustrated",
+        "history": [
+          "init → 5 (frustrated)",
+          "force → 5 (frustrated) [selected frustration level]"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "meta": {
+    "session_id": "991c9425",
+    "started_at": "2026-09-14T15:24:44.626975Z",
+    "ended_at": "2026-09-14T15:27:03.704001Z",
+    "config": {
+      "persona": "frustrated",
+      "scenario": "refund_request",
+      "initial_emotion": "frustrated",
+      "issue_severity": 8,
+      "patience_level": 2,
+      "expected_resolution": "full_refund",
+      "use_llm": true
+    },
+    "final_emotion": {
+      "intensity": 9,
+      "label": "furious",
+      "history": [
+        "init → 6 (frustrated)",
+        "frustrated(6) → angry(8) [Δ+2]",
+        "angry(8) → furious(9) [Δ+1]"
+      ]
+    },
+    "turn_count": 5
+  },
+  "conversation": [
+    {
+      "turn": 1,
+      "timestamp": "2026-09-14T15:24:46.120508Z",
+      "role": "customer",
+      "message": "I need a refund for order ORD-78421. The Wireless Noise-Cancelling Headphones arrived damaged – Item arrived with a crack in the left ear cup. This is not acceptable.",
+      "emotion": {
+        "intensity": 6,
+        "label": "frustrated",
+        "history": [
+          "init → 6 (frustrated)"
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "timestamp": "2026-09-14T15:25:38.246644Z",
+      "role": "agent",
+      "message": "we will check for it....can you please wait for some time.",
+      "emotion": null
+    },
+    {
+      "turn": 3,
+      "timestamp": "2026-09-14T15:25:38.990751Z",
+      "role": "customer",
+      "message": "That doesn't help. I need this fixed immediately or I'm escalating to a manager.",
+      "emotion": {
+        "intensity": 8,
+        "label": "angry",
+        "history": [
+          "init → 6 (frustrated)",
+          "frustrated(6) → angry(8) [Δ+2]"
+        ]
+      }
+    },
+    {
+      "turn": 4,
+      "timestamp": "2026-09-14T15:26:39.196371Z",
+      "role": "agent",
+      "message": "please give me some time .I'll  let you know shortly",
+      "emotion": null
+    },
+    {
+      "turn": 5,
+      "timestamp": "2026-09-14T15:26:39.919153Z",
+      "role": "customer",
+      "message": "That doesn't help. I need this fixed immediately or I'm escalating to a manager.",
+      "emotion": {
+        "intensity": 9,
+        "label": "furious",
+        "history": [
+          "init → 6 (frustrated)",
+          "frustrated(6) → angry(8) [Δ+2]",
+          "angry(8) → furious(9) [Δ+1]"
+        ]
+      }
+    }
+  ]
+}

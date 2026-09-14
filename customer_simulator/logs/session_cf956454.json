@@ -1,0 +1,39 @@
+{
+  "meta": {
+    "session_id": "cf956454",
+    "started_at": "2026-09-14T15:27:17.228426Z",
+    "ended_at": "2026-09-14T15:27:43.858211Z",
+    "config": {
+      "persona": "frustrated",
+      "scenario": "refund_request",
+      "initial_emotion": "frustrated",
+      "issue_severity": 6,
+      "patience_level": 2,
+      "expected_resolution": "full_refund",
+      "use_llm": true
+    },
+    "final_emotion": {
+      "intensity": 6,
+      "label": "frustrated",
+      "history": [
+        "init → 6 (frustrated)"
+      ]
+    },
+    "turn_count": 1
+  },
+  "conversation": [
+    {
+      "turn": 1,
+      "timestamp": "2026-09-14T15:27:18.456454Z",
+      "role": "customer",
+      "message": "I need a refund for order ORD-78421. The Wireless Noise-Cancelling Headphones arrived damaged – Item arrived with a crack in the left ear cup. This is not acceptable.",
+      "emotion": {
+        "intensity": 6,
+        "label": "frustrated",
+        "history": [
+          "init → 6 (frustrated)"
+        ]
+      }
+    }
+  ]
+}

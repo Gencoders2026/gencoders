@@ -1,0 +1,84 @@
+{
+  "meta": {
+    "session_id": "79234656",
+    "started_at": "2026-09-14T15:13:46.008410Z",
+    "ended_at": "2026-09-14T15:18:22.729185Z",
+    "config": {
+      "persona": "frustrated",
+      "scenario": "refund_request",
+      "initial_emotion": "frustrated",
+      "issue_severity": 7,
+      "patience_level": 5,
+      "expected_resolution": "full_refund",
+      "use_llm": true
+    },
+    "final_emotion": {
+      "intensity": 3,
+      "label": "mildly_concerned",
+      "history": [
+        "init → 6 (frustrated)",
+        "frustrated(6) → concerned(4) [Δ-2]",
+        "concerned(4) → mildly_concerned(3) [Δ-1]"
+      ]
+    },
+    "turn_count": 5
+  },
+  "conversation": [
+    {
+      "turn": 1,
+      "timestamp": "2026-09-14T15:13:47.432108Z",
+      "role": "customer",
+      "message": "I need a refund for order ORD-78421. The Wireless Noise-Cancelling Headphones arrived damaged – Item arrived with a crack in the left ear cup. This is not acceptable.",
+      "emotion": {
+        "intensity": 6,
+        "label": "frustrated",
+        "history": [
+          "init → 6 (frustrated)"
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "timestamp": "2026-09-14T15:15:31.479061Z",
+      "role": "agent",
+      "message": "I'm truly sorry that your headphones arrived damaged .that is completely unacceptable .i understand how frustating you are .i will process a full refund for order ORD-78421 right now",
+      "emotion": null
+    },
+    {
+      "turn": 3,
+      "timestamp": "2026-09-14T15:15:32.191870Z",
+      "role": "customer",
+      "message": "Okay, but I still need a concrete resolution. What exactly will you do and when?",
+      "emotion": {
+        "intensity": 4,
+        "label": "concerned",
+        "history": [
+          "init → 6 (frustrated)",
+          "frustrated(6) → concerned(4) [Δ-2]"
+        ]
+      }
+    },
+    {
+      "turn": 4,
+      "timestamp": "2026-09-14T15:17:17.511981Z",
+      "role": "agent",
+      "message": "I'm processing the full refund for order ORD-78421 right now.You'll get the money in 3-5 days and confirmation email within 10 min.",
+      "emotion": null
+    },
+    {
+      "turn": 5,
+      "timestamp": "2026-09-14T15:17:18.193077Z",
+      "role": "customer",
+      "message": "Thank you. Could you confirm the details so I know it's taken care of?",
+      "emotion": {
+        "intensity": 3,
+        "label": "mildly_concerned",
+        "history": [
+          "init → 6 (frustrated)",
+          "frustrated(6) → concerned(4) [Δ-2]",
+          "concerned(4) → mildly_concerned(3) [Δ-1]"
+        ]
+      }
+    }
+  ]
+}

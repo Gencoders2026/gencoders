@@ -1,10 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
   <title>Support Console – Customer Simulator</title>
+
   <style>
+
     :root {
       --bg: #f4f6f9;
       --sidebar: #ffffff;
@@ -16,630 +24,2653 @@
       --muted: #64748b;
       --radius: 10px;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+
       background: var(--bg);
       color: var(--text);
+
       height: 100vh;
+
       display: flex;
+
       overflow: hidden;
     }
+
+    /* =====================================================
+       SIDEBAR
+       ===================================================== */
+
     .sidebar {
       width: 240px;
+
       background: var(--sidebar);
+
       border-right: 1px solid var(--border);
+
       padding: 20px 16px;
+
       display: flex;
       flex-direction: column;
+
       gap: 24px;
     }
+
     .sidebar h2 {
       font-size: 15px;
+
       font-weight: 600;
+
       display: flex;
+
       align-items: center;
+
       gap: 8px;
     }
-    .sidebar h2::before { content: "🎧"; }
+
+    .sidebar h2::before {
+      content: "🎧";
+    }
+
     .section-label {
       font-size: 11px;
+
       font-weight: 600;
+
       text-transform: uppercase;
+
       letter-spacing: 0.05em;
+
       color: var(--muted);
+
       margin-bottom: 8px;
     }
+
     .mode-list label {
       display: flex;
+
       align-items: center;
+
       gap: 8px;
+
       padding: 8px 10px;
+
       border-radius: 8px;
+
       cursor: pointer;
+
       font-size: 14px;
+
       margin-bottom: 2px;
     }
-    .mode-list label:hover { background: #f1f5f9; }
-    .mode-list input { accent-color: var(--accent); }
+
+    .mode-list label:hover {
+      background: #f1f5f9;
+    }
+
+    .mode-list input {
+      accent-color: var(--accent);
+    }
+
     .mode-list label.active {
       background: #eff6ff;
+
       color: var(--accent);
+
       font-weight: 500;
     }
+
     .analyst-note {
       font-size: 12px;
+
       color: var(--muted);
+
       line-height: 1.45;
+
       margin-top: 8px;
     }
+
     .btn-clear {
       margin-top: auto;
+
       padding: 8px 12px;
+
       border: 1px solid var(--border);
+
       background: white;
+
       border-radius: 8px;
+
       font-size: 13px;
+
       cursor: pointer;
     }
-    .btn-clear:hover { background: #f8fafc; }
+
+    .btn-clear:hover {
+      background: #f8fafc;
+    }
+
+    /* =====================================================
+       MAIN
+       ===================================================== */
+
     .main {
       flex: 1;
+
       display: flex;
+
       flex-direction: column;
+
       overflow: hidden;
     }
+
+    /* =====================================================
+       TOP BAR
+       ===================================================== */
+
     .topbar {
       background: white;
+
       border-bottom: 1px solid var(--border);
+
       padding: 12px 24px;
+
       display: flex;
+
       align-items: center;
+
       justify-content: space-between;
     }
+
     .topbar-left {
       display: flex;
+
       align-items: center;
+
       gap: 12px;
+
       font-size: 14px;
+
       font-weight: 500;
     }
+
     .badge {
       font-size: 12px;
+
       padding: 3px 10px;
+
       border-radius: 999px;
+
       background: #ecfdf5;
+
       color: #059669;
+
       display: flex;
+
       align-items: center;
+
       gap: 4px;
     }
+
     .badge::before {
       content: "";
-      width: 6px; height: 6px;
+
+      width: 6px;
+      height: 6px;
+
       border-radius: 50%;
+
       background: #22c55e;
     }
+
+    /* =====================================================
+       CONTENT
+       ===================================================== */
+
     .content {
       flex: 1;
+
       display: grid;
+
       grid-template-columns: 1fr 320px;
+
       gap: 20px;
+
       padding: 20px 24px;
+
       overflow: auto;
     }
+
     .card {
       background: var(--card);
+
       border: 1px solid var(--border);
+
       border-radius: var(--radius);
+
       padding: 18px 20px;
     }
+
     .card-title {
       font-size: 16px;
+
       font-weight: 600;
+
       margin-bottom: 4px;
+
       display: flex;
+
       align-items: center;
+
       gap: 8px;
     }
+
     .card-sub {
       font-size: 13px;
+
       color: var(--muted);
+
       margin-bottom: 14px;
     }
+
+    /* =====================================================
+       FRUSTRATION PILL
+       ===================================================== */
+
     .emotion-pill {
       font-size: 12px;
+
       padding: 2px 10px;
+
       border-radius: 999px;
+
       background: #fef3c7;
+
       color: #b45309;
+
       font-weight: 500;
     }
-    .emotion-pill.high { background: #fee2e2; color: #b91c1c; }
-    .emotion-pill.low { background: #dcfce7; color: #15803d; }
+
+    .emotion-pill.high {
+      background: #fee2e2;
+
+      color: #b91c1c;
+    }
+
+    .emotion-pill.low {
+      background: #dcfce7;
+
+      color: #15803d;
+    }
+
+    /* =====================================================
+       CONVERSATION
+       ===================================================== */
+
     .conversation {
       min-height: 180px;
-      max-height: 320px;
+
+      max-height: 380px;
+
       overflow-y: auto;
+
       border: 1px solid var(--border);
+
       border-radius: 8px;
+
       padding: 12px;
+
       background: #f8fafc;
+
       margin-bottom: 14px;
     }
+
     .msg {
       margin-bottom: 10px;
+
       max-width: 85%;
+
       padding: 10px 14px;
+
       border-radius: 12px;
+
       font-size: 14px;
+
       line-height: 1.45;
     }
+
     .msg.customer {
       background: #eff6ff;
+
       border: 1px solid #bfdbfe;
+
       margin-right: auto;
     }
+
     .msg.agent {
       background: #f1f5f9;
+
       border: 1px solid #e2e8f0;
+
       margin-left: auto;
     }
+
     .msg .meta {
       font-size: 11px;
+
       color: var(--muted);
+
       margin-bottom: 2px;
     }
+
     .empty-state {
       text-align: center;
+
       color: var(--muted);
+
       padding: 40px 20px;
+
       font-size: 14px;
     }
+
+    /* =====================================================
+       TEXTAREA
+       ===================================================== */
+
     textarea {
       width: 100%;
+
       min-height: 80px;
+
       padding: 12px;
+
       border: 1px solid var(--border);
+
       border-radius: 8px;
+
       font-size: 14px;
+
       resize: vertical;
+
       font-family: inherit;
     }
+
     textarea:focus {
       outline: none;
+
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+
+      box-shadow:
+        0 0 0 3px rgba(59, 130, 246, 0.15);
     }
+
+    /* =====================================================
+       BUTTON
+       ===================================================== */
+
     .btn-primary {
       display: block;
+
       width: 100%;
+
       margin-top: 10px;
+
       padding: 12px;
+
       background: var(--primary);
+
       color: white;
+
       border: none;
+
       border-radius: 8px;
+
       font-size: 14px;
+
       font-weight: 500;
+
       cursor: pointer;
     }
-    .btn-primary:hover { background: #0f172a; }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-primary:hover {
+      background: #0f172a;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+
+      cursor: not-allowed;
+    }
+
+    /* =====================================================
+       CONFIGURATION
+       ===================================================== */
+
     .config-grid {
       display: grid;
+
       grid-template-columns: 1fr 1fr;
+
       gap: 12px;
+
       margin-bottom: 14px;
     }
+
     .config-grid label {
       font-size: 12px;
+
       font-weight: 500;
+
       color: var(--muted);
+
       display: block;
+
       margin-bottom: 4px;
     }
-    select, input[type="number"], input[type="text"] {
+
+    select,
+    input[type="number"],
+    input[type="text"] {
       width: 100%;
+
       padding: 8px 10px;
+
       border: 1px solid var(--border);
+
       border-radius: 6px;
+
       font-size: 13px;
+
+      background: white;
     }
-    .copilot-empty {
-      text-align: center;
+
+    select:focus,
+    input:focus {
+      outline: none;
+
+      border-color: var(--accent);
+
+      box-shadow:
+        0 0 0 3px rgba(59, 130, 246, 0.10);
+    }
+
+    /* =====================================================
+       FRUSTRATION HELP
+       ===================================================== */
+
+    .frustration-help {
+      grid-column: 1 / -1;
+
+      padding: 10px 12px;
+
+      background: #f8fafc;
+
+      border: 1px solid var(--border);
+
+      border-radius: 8px;
+
+      font-size: 12px;
+
       color: var(--muted);
-      padding: 40px 16px;
-      font-size: 13px;
+
       line-height: 1.5;
     }
+
+    .frustration-help strong {
+      color: var(--text);
+    }
+
+    /* =====================================================
+       COPILOT
+       ===================================================== */
+
+    .copilot-empty {
+      text-align: center;
+
+      color: var(--muted);
+
+      padding: 40px 16px;
+
+      font-size: 13px;
+
+      line-height: 1.5;
+    }
+
     .copilot-item {
       margin-bottom: 12px;
+
       padding: 10px 12px;
+
       background: #f8fafc;
+
       border-radius: 8px;
+
       font-size: 13px;
+
+      line-height: 1.5;
     }
+
     .copilot-item strong {
       display: block;
+
       margin-bottom: 4px;
+
       font-size: 12px;
+
       color: var(--muted);
     }
-    .hidden { display: none !important; }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* =====================================================
+       RESPONSIVE
+       ===================================================== */
+
+    @media (max-width: 900px) {
+
+      .sidebar {
+        width: 190px;
+      }
+
+      .content {
+        grid-template-columns: 1fr;
+      }
+
+    }
+
+    @media (max-width: 650px) {
+
+      body {
+        overflow: auto;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .content {
+        padding: 12px;
+      }
+
+      .config-grid {
+        grid-template-columns: 1fr;
+      }
+
+    }
+
   </style>
 </head>
+
+
 <body>
+
+  <!-- =====================================================
+       SIDEBAR
+       ===================================================== -->
+
   <aside class="sidebar">
-    <h2>Support Console</h2>
+
+    <h2>
+      Support Console
+    </h2>
+
     <div>
-      <div class="section-label">Workspace Mode</div>
-      <div class="mode-list">
-        <label class="active" data-mode="simulator">
-          <input type="radio" name="mode" value="simulator" checked /> Live Simulator
-        </label>
-        <label data-mode="manual">
-          <input type="radio" name="mode" value="manual" /> Manual Analysis
-        </label>
-        <label data-mode="replay">
-          <input type="radio" name="mode" value="replay" /> Replay Library
-        </label>
+
+      <div class="section-label">
+        Workspace Mode
       </div>
+
+      <div class="mode-list">
+
+        <label
+          class="active"
+          data-mode="simulator"
+        >
+          <input
+            type="radio"
+            name="mode"
+            value="simulator"
+            checked
+          />
+
+          Live Simulator
+        </label>
+
+
+        <label data-mode="manual">
+
+          <input
+            type="radio"
+            name="mode"
+            value="manual"
+          />
+
+          Manual Analysis
+        </label>
+
+
+        <label data-mode="replay">
+
+          <input
+            type="radio"
+            name="mode"
+            value="replay"
+          />
+
+          Replay Library
+        </label>
+
+      </div>
+
     </div>
+
+
     <div>
-      <div class="section-label">Analyst Tools</div>
+
+      <div class="section-label">
+        Analyst Tools
+      </div>
+
       <p class="analyst-note">
-        Paste customer queries into the central workspace to receive real-time intent,
-        escalation risk, and coaching guidance.
+
+        Paste customer queries into the central
+        workspace to receive real-time intent,
+        frustration level, escalation risk,
+        and coaching guidance.
+
       </p>
+
     </div>
-    <button class="btn-clear" id="btnClear">Clear Analyst Session</button>
+
+
+    <button
+      class="btn-clear"
+      id="btnClear"
+    >
+      Clear Analyst Session
+    </button>
+
   </aside>
 
+
+  <!-- =====================================================
+       MAIN
+       ===================================================== -->
+
   <div class="main">
+
+
+    <!-- ===================================================
+         TOP BAR
+         =================================================== -->
+
     <div class="topbar">
+
       <div class="topbar-left">
-        <span>🎧 Support Console</span>
-        <span style="color:var(--muted);font-weight:400">/</span>
-        <span id="modeTitle">Live Simulator</span>
+
+        <span>
+          🎧 Support Console
+        </span>
+
+        <span
+          style="color:var(--muted);font-weight:400"
+        >
+          /
+        </span>
+
+        <span id="modeTitle">
+          Live Simulator
+        </span>
+
       </div>
-      <div class="badge" id="sessionBadge">Session Idle</div>
+
+
+      <div
+        class="badge"
+        id="sessionBadge"
+      >
+        Session Idle
+      </div>
+
     </div>
+
+
+    <!-- ===================================================
+         CONTENT
+         =================================================== -->
 
     <div class="content">
+
+
+      <!-- =================================================
+           LEFT
+           ================================================= -->
+
       <div>
-        <!-- LIVE SIMULATOR -->
+
+
+        <!-- ===============================================
+             LIVE SIMULATOR
+             =============================================== -->
+
         <div id="viewSimulator">
-          <div class="card" style="margin-bottom:16px">
+
+
+          <!-- =============================================
+               CONFIGURATION
+               ============================================= -->
+
+          <div
+            class="card"
+            style="margin-bottom:16px"
+          >
+
             <div class="card-title">
+
               Live Customer Inquiry
-              <span class="emotion-pill" id="emotionPill">–</span>
-            </div>
-            <div class="card-sub" id="sessionMeta">Configure and start a simulation session</div>
 
-            <div class="config-grid" id="configPanel">
-              <div>
-                <label>Persona</label>
-                <select id="cfgPersona"></select>
-              </div>
-              <div>
-                <label>Scenario</label>
-                <select id="cfgScenario"></select>
-              </div>
-              <div>
-                <label>Initial Emotion</label>
-                <select id="cfgEmotion">
-                  <option value="calm">calm</option>
-                  <option value="confused">confused</option>
-                  <option value="frustrated" selected>frustrated</option>
-                  <option value="angry">angry</option>
-                  <option value="impatient">impatient</option>
-                  <option value="polite">polite</option>
-                </select>
-              </div>
-              <div>
-                <label>Issue Severity (1-10)</label>
-                <input type="number" id="cfgSeverity" min="1" max="10" value="7" />
-              </div>
-              <div>
-                <label>Patience Level (1-10)</label>
-                <input type="number" id="cfgPatience" min="1" max="10" value="5" />
-              </div>
-              <div>
-                <label>Expected Resolution</label>
-                <select id="cfgResolution">
-                  <option value="full_refund">full_refund</option>
-                  <option value="partial_refund">partial_refund</option>
-                  <option value="replacement">replacement</option>
-                  <option value="store_credit">store_credit</option>
-                  <option value="cancellation_confirmed">cancellation_confirmed</option>
-                  <option value="account_restored">account_restored</option>
-                  <option value="new_delivery_date">new_delivery_date</option>
-                </select>
-              </div>
+              <span
+                class="emotion-pill"
+                id="emotionPill"
+              >
+                –
+              </span>
+
             </div>
-            <button class="btn-primary" id="btnStart">Start Simulation</button>
+
+
+            <div
+              class="card-sub"
+              id="sessionMeta"
+            >
+              Configure persona, scenario, and
+              customer frustration level.
+            </div>
+
+
+            <div
+              class="config-grid"
+              id="configPanel"
+            >
+
+
+              <!-- PERSONA -->
+
+              <div>
+
+                <label>
+                  Persona
+                </label>
+
+                <select
+                  id="cfgPersona"
+                >
+                </select>
+
+              </div>
+
+
+              <!-- SCENARIO -->
+
+              <div>
+
+                <label>
+                  Scenario
+                </label>
+
+                <select
+                  id="cfgScenario"
+                >
+                </select>
+
+              </div>
+
+
+              <!-- FRUSTRATION -->
+
+              <div>
+
+                <label>
+                  Frustration Level (1-10)
+                </label>
+
+                <input
+                  type="number"
+                  id="cfgFrustration"
+                  min="1"
+                  max="10"
+                  value="5"
+                />
+
+              </div>
+
+
+              <!-- EXPECTED RESOLUTION -->
+
+              <div>
+
+                <label>
+                  Expected Resolution
+                </label>
+
+                <select
+                  id="cfgResolution"
+                >
+
+                  <option value="full_refund">
+                    full_refund
+                  </option>
+
+                  <option value="partial_refund">
+                    partial_refund
+                  </option>
+
+                  <option value="replacement">
+                    replacement
+                  </option>
+
+                  <option value="store_credit">
+                    store_credit
+                  </option>
+
+                  <option value="cancellation_confirmed">
+                    cancellation_confirmed
+                  </option>
+
+                  <option value="account_restored">
+                    account_restored
+                  </option>
+
+                  <option value="new_delivery_date">
+                    new_delivery_date
+                  </option>
+
+                </select>
+
+              </div>
+
+
+              <!-- FRUSTRATION EXPLANATION -->
+
+              <div class="frustration-help">
+
+                <strong>
+                  Frustration Level:
+                </strong>
+
+                1–2 = calm and polite &nbsp;|&nbsp;
+                3–4 = concerned &nbsp;|&nbsp;
+                5–6 = frustrated &nbsp;|&nbsp;
+                7–8 = angry &nbsp;|&nbsp;
+                9–10 = furious
+
+                <br />
+
+                The selected level controls the
+                customer's emotional intensity,
+                wording, urgency, and tone.
+
+              </div>
+
+            </div>
+
+
+            <button
+              class="btn-primary"
+              id="btnStart"
+            >
+              Start Simulation
+            </button>
+
           </div>
+
+
+          <!-- =============================================
+               CONVERSATION
+               ============================================= -->
 
           <div class="card">
-            <div class="card-title">Conversation</div>
-            <div class="conversation" id="conversation">
-              <div class="empty-state">No messages in this session yet.</div>
+
+            <div class="card-title">
+              Conversation
             </div>
-            <div id="agentInputArea" class="hidden">
-              <label style="font-size:12px;font-weight:500;color:var(--muted)">Your reply as support agent</label>
-              <textarea id="agentMsg" placeholder="Type your support response here..."></textarea>
-              <button class="btn-primary" id="btnSend">Send Reply & Get Customer Response</button>
+
+
+            <div
+              class="conversation"
+              id="conversation"
+            >
+
+              <div class="empty-state">
+
+                No messages in this session yet.
+
+              </div>
+
             </div>
+
+
+            <!-- AGENT INPUT -->
+
+            <div
+              id="agentInputArea"
+              class="hidden"
+            >
+
+              <label
+                style="
+                  font-size:12px;
+                  font-weight:500;
+                  color:var(--muted)
+                "
+              >
+                Your reply as support agent
+              </label>
+
+
+              <textarea
+                id="agentMsg"
+                placeholder="Type your support response here..."
+              ></textarea>
+
+
+              <button
+                class="btn-primary"
+                id="btnSend"
+              >
+                Send Reply & Get Customer Response
+              </button>
+
+            </div>
+
           </div>
+
         </div>
 
-        <!-- MANUAL ANALYSIS -->
-        <div id="viewManual" class="hidden">
-          <div class="card" style="margin-bottom:16px">
-            <div class="card-title">Live Customer Inquiry</div>
-            <div class="card-sub">Awaiting customer message…</div>
+
+        <!-- =================================================
+             MANUAL ANALYSIS
+             ================================================= -->
+
+        <div
+          id="viewManual"
+          class="hidden"
+        >
+
+          <div
+            class="card"
+            style="margin-bottom:16px"
+          >
+
+            <div class="card-title">
+              Customer Message Analysis
+            </div>
+
+            <div class="card-sub">
+
+              Analyze customer intent and
+              frustration level.
+
+            </div>
+
           </div>
+
+
           <div class="card">
-            <div class="card-title">Customer Message</div>
-            <textarea id="manualQuery" placeholder="Paste incoming customer query here to analyze…" style="min-height:120px"></textarea>
-            <button class="btn-primary" id="btnAnalyze">Analyze Message</button>
+
+            <div class="card-title">
+              Customer Message
+            </div>
+
+
+            <textarea
+              id="manualQuery"
+              placeholder="Paste incoming customer query here to analyze..."
+              style="min-height:120px"
+            ></textarea>
+
+
+            <button
+              class="btn-primary"
+              id="btnAnalyze"
+            >
+              Analyze Message
+            </button>
+
           </div>
-          <div class="card" style="margin-top:16px" id="analyzeResult" class="hidden">
-            <div class="card-title">Analysis Result</div>
+
+
+          <div
+            class="card hidden"
+            style="margin-top:16px"
+            id="analyzeResult"
+          >
+
+            <div class="card-title">
+              Analysis Result
+            </div>
+
             <div id="analyzeBody"></div>
+
           </div>
+
         </div>
 
-        <!-- REPLAY -->
-        <div id="viewReplay" class="hidden">
+
+        <!-- =================================================
+             REPLAY
+             ================================================= -->
+
+        <div
+          id="viewReplay"
+          class="hidden"
+        >
+
           <div class="card">
-            <div class="card-title">Replay Library</div>
-            <div class="card-sub">Past session logs appear here after you run simulations.</div>
-            <div id="replayList" style="font-size:13px;color:var(--muted)">No logs loaded yet. Run a simulation first.</div>
+
+            <div class="card-title">
+              Replay Library
+            </div>
+
+            <div class="card-sub">
+
+              Past session logs appear here after
+              you run simulations.
+
+            </div>
+
+            <div
+              id="replayList"
+              style="
+                font-size:13px;
+                color:var(--muted)
+              "
+            >
+
+              No logs loaded yet.
+              Run a simulation first.
+
+            </div>
+
           </div>
+
         </div>
+
+
       </div>
 
-      <!-- COPILOT -->
+
+      <!-- =================================================
+           RIGHT – COPILOT
+           ================================================= -->
+
       <div>
-        <div class="card" style="height:100%">
-          <div class="card-title">Agent Copilot</div>
-          <div id="copilotPanel">
-            <div class="copilot-empty">
-              No active session<br/><br/>
-              Start a training simulation or select a transcript to view copilot guidance.
-            </div>
+
+        <div
+          class="card"
+          style="height:100%"
+        >
+
+          <div class="card-title">
+            Agent Copilot
           </div>
+
+
+          <div id="copilotPanel">
+
+            <div class="copilot-empty">
+
+              No active session
+
+              <br />
+              <br />
+
+              Start a training simulation or
+              select a transcript to view
+              copilot guidance.
+
+            </div>
+
+          </div>
+
         </div>
+
       </div>
+
+
     </div>
+
   </div>
 
-  <script>
-    const API = window.location.origin;
-    let currentSessionId = null;
 
-    document.querySelectorAll('.mode-list label').forEach(lab => {
-      lab.addEventListener('click', () => {
-        document.querySelectorAll('.mode-list label').forEach(l => l.classList.remove('active'));
-        lab.classList.add('active');
-        lab.querySelector('input').checked = true;
-        const mode = lab.dataset.mode;
-        document.getElementById('viewSimulator').classList.toggle('hidden', mode !== 'simulator');
-        document.getElementById('viewManual').classList.toggle('hidden', mode !== 'manual');
-        document.getElementById('viewReplay').classList.toggle('hidden', mode !== 'replay');
-        document.getElementById('modeTitle').textContent =
-          mode === 'simulator' ? 'Live Simulator' :
-          mode === 'manual' ? 'Manual Analysis / Ad-hoc Query' : 'Replay Library';
-        if (mode === 'replay') loadReplayList();
+  <!-- =====================================================
+       JAVASCRIPT
+       ===================================================== -->
+
+  <script>
+
+    /* =====================================================
+       API
+       ===================================================== */
+
+    const API =
+      window.location.origin;
+
+
+    let currentSessionId =
+      null;
+
+
+    /* =====================================================
+       MODE SWITCHING
+       ===================================================== */
+
+    document
+      .querySelectorAll(
+        '.mode-list label'
+      )
+      .forEach(label => {
+
+        label.addEventListener(
+          'click',
+          () => {
+
+            document
+              .querySelectorAll(
+                '.mode-list label'
+              )
+              .forEach(item => {
+
+                item.classList.remove(
+                  'active'
+                );
+
+              });
+
+
+            label.classList.add(
+              'active'
+            );
+
+
+            label
+              .querySelector('input')
+              .checked = true;
+
+
+            const mode =
+              label.dataset.mode;
+
+
+            document
+              .getElementById(
+                'viewSimulator'
+              )
+              .classList.toggle(
+                'hidden',
+                mode !== 'simulator'
+              );
+
+
+            document
+              .getElementById(
+                'viewManual'
+              )
+              .classList.toggle(
+                'hidden',
+                mode !== 'manual'
+              );
+
+
+            document
+              .getElementById(
+                'viewReplay'
+              )
+              .classList.toggle(
+                'hidden',
+                mode !== 'replay'
+              );
+
+
+            document
+              .getElementById(
+                'modeTitle'
+              )
+              .textContent =
+                mode === 'simulator'
+                  ? 'Live Simulator'
+                  : mode === 'manual'
+                    ? 'Manual Analysis / Ad-hoc Query'
+                    : 'Replay Library';
+
+
+            if (
+              mode === 'replay'
+            ) {
+
+              loadReplayList();
+
+            }
+
+          }
+
+        );
+
       });
-    });
+
+
+    /* =====================================================
+       LOAD OPTIONS
+       ===================================================== */
 
     async function loadOptions() {
+
       try {
-        const res = await fetch(`${API}/config/options`);
-        const data = await res.json();
-        const pSel = document.getElementById('cfgPersona');
-        const sSel = document.getElementById('cfgScenario');
-        data.personas.forEach(p => {
-          const o = document.createElement('option');
-          o.value = p; o.textContent = p;
-          if (p === 'frustrated') o.selected = true;
-          pSel.appendChild(o);
-        });
-        data.scenarios.forEach(s => {
-          const o = document.createElement('option');
-          o.value = s; o.textContent = s;
-          if (s === 'refund_request') o.selected = true;
-          sSel.appendChild(o);
-        });
-      } catch (e) {
-        console.warn('Could not load options', e);
+
+        const response =
+          await fetch(
+            `${API}/config/options`
+          );
+
+
+        if (!response.ok) {
+
+          throw new Error(
+            'Failed to load options'
+          );
+
+        }
+
+
+        const data =
+          await response.json();
+
+
+        const personaSelect =
+          document.getElementById(
+            'cfgPersona'
+          );
+
+
+        const scenarioSelect =
+          document.getElementById(
+            'cfgScenario'
+          );
+
+
+        personaSelect.innerHTML = '';
+        scenarioSelect.innerHTML = '';
+
+
+        /* -----------------------------------------------
+           PERSONAS
+           ----------------------------------------------- */
+
+        data.personas.forEach(
+          persona => {
+
+            const option =
+              document.createElement(
+                'option'
+              );
+
+
+            option.value =
+              persona;
+
+            option.textContent =
+              persona;
+
+
+            if (
+              persona === 'frustrated'
+            ) {
+
+              option.selected =
+                true;
+
+            }
+
+
+            personaSelect.appendChild(
+              option
+            );
+
+          }
+        );
+
+
+        /* -----------------------------------------------
+           SCENARIOS
+           ----------------------------------------------- */
+
+        data.scenarios.forEach(
+          scenario => {
+
+            const option =
+              document.createElement(
+                'option'
+              );
+
+
+            option.value =
+              scenario;
+
+            option.textContent =
+              scenario;
+
+
+            if (
+              scenario === 'refund_request'
+            ) {
+
+              option.selected =
+                true;
+
+            }
+
+
+            scenarioSelect.appendChild(
+              option
+            );
+
+          }
+        );
+
+
+      } catch (error) {
+
+        console.error(
+          'Could not load options:',
+          error
+        );
+
       }
+
     }
+
+
+    /* =====================================================
+       LOAD OPTIONS ON PAGE LOAD
+       ===================================================== */
+
     loadOptions();
 
-    function setEmotionPill(emotion) {
-      const pill = document.getElementById('emotionPill');
-      if (!emotion) { pill.textContent = '–'; return; }
-      pill.textContent = `${emotion.label} (${emotion.intensity}/10)`;
-      pill.className = 'emotion-pill';
-      if (emotion.intensity >= 7) pill.classList.add('high');
-      else if (emotion.intensity <= 3) pill.classList.add('low');
-    }
 
-    function addMessage(role, text, emotion) {
-      const box = document.getElementById('conversation');
-      if (box.querySelector('.empty-state')) box.innerHTML = '';
-      const div = document.createElement('div');
-      div.className = `msg ${role}`;
-      const meta = role === 'customer'
-        ? `Customer${emotion ? ' · ' + emotion.label + ' (' + emotion.intensity + '/10)' : ''}`
-        : 'Support Agent';
-      div.innerHTML = `<div class="meta">${meta}</div>${escapeHtml(text)}`;
-      box.appendChild(div);
-      box.scrollTop = box.scrollHeight;
-    }
+    /* =====================================================
+       FRUSTRATION PILL
+       ===================================================== */
 
-    function escapeHtml(s) {
-      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
+    function setEmotionPill(
+      emotion
+    ) {
 
-    function updateCopilot(data) {
-      const panel = document.getElementById('copilotPanel');
-      if (!data) {
-        panel.innerHTML = `<div class="copilot-empty">No active session<br/><br/>Start a training simulation or select a transcript to view copilot guidance.</div>`;
+      const pill =
+        document.getElementById(
+          'emotionPill'
+        );
+
+
+      if (!emotion) {
+
+        pill.textContent = '–';
+
         return;
+
       }
-      let html = '';
-      if (data.emotion) {
-        html += `<div class="copilot-item"><strong>Current Emotion</strong>${data.emotion.label} (${data.emotion.intensity}/10)</div>`;
+
+
+      const intensity =
+        Number(
+          emotion.intensity || 0
+        );
+
+
+      const label =
+        emotion.label || 'unknown';
+
+
+      pill.textContent =
+        `${label} (${intensity}/10)`;
+
+
+      pill.className =
+        'emotion-pill';
+
+
+      if (intensity >= 7) {
+
+        pill.classList.add(
+          'high'
+        );
+
       }
-      if (data.persona) html += `<div class="copilot-item"><strong>Persona</strong>${data.persona}</div>`;
-      if (data.scenario) html += `<div class="copilot-item"><strong>Scenario</strong>${data.scenario}</div>`;
-      html += `<div class="copilot-item"><strong>Coaching Tips</strong>
-        • Acknowledge feelings first if intensity ≥ 6<br/>
-        • Give a concrete next step + timeline<br/>
-        • Avoid pure policy language when customer is angry
-      </div>`;
-      panel.innerHTML = html;
+
+      else if (intensity <= 3) {
+
+        pill.classList.add(
+          'low'
+        );
+
+      }
+
     }
 
-    document.getElementById('btnStart').addEventListener('click', async () => {
-      const body = {
-        persona: document.getElementById('cfgPersona').value,
-        scenario: document.getElementById('cfgScenario').value,
-        initial_emotion: document.getElementById('cfgEmotion').value,
-        issue_severity: parseInt(document.getElementById('cfgSeverity').value, 10),
-        patience_level: parseInt(document.getElementById('cfgPatience').value, 10),
-        expected_resolution: document.getElementById('cfgResolution').value,
-        use_llm: true
-      };
-      const btn = document.getElementById('btnStart');
-      btn.disabled = true;
-      btn.textContent = 'Starting…';
-      try {
-        const res = await fetch(`${API}/session/start`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        currentSessionId = data.session_id;
-        document.getElementById('conversation').innerHTML = '';
-        addMessage('customer', data.customer_message, data.emotion);
-        setEmotionPill(data.emotion);
-        document.getElementById('sessionMeta').textContent =
-          `Session ${data.session_id} · ${data.persona} · ${data.scenario}`;
-        document.getElementById('sessionBadge').textContent = 'Session Active';
-        document.getElementById('agentInputArea').classList.remove('hidden');
-        document.getElementById('configPanel').classList.add('hidden');
-        btn.classList.add('hidden');
-        updateCopilot(data);
-      } catch (e) {
-        alert('Failed to start: ' + e.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Start Simulation';
-      }
-    });
 
-    document.getElementById('btnSend').addEventListener('click', async () => {
-      const msg = document.getElementById('agentMsg').value.trim();
-      if (!msg || !currentSessionId) return;
-      const btn = document.getElementById('btnSend');
-      btn.disabled = true;
-      addMessage('agent', msg);
-      document.getElementById('agentMsg').value = '';
-      try {
-        const res = await fetch(`${API}/session/respond`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: currentSessionId, message: msg })
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        addMessage('customer', data.customer_message, data.emotion);
-        setEmotionPill(data.emotion);
-        updateCopilot(data);
-        if (data.finished) {
-          document.getElementById('sessionBadge').textContent = 'Session Resolved';
-          btn.textContent = 'Session finished';
+    /* =====================================================
+       ADD MESSAGE
+       ===================================================== */
+
+    function addMessage(
+      role,
+      text,
+      emotion
+    ) {
+
+      const box =
+        document.getElementById(
+          'conversation'
+        );
+
+
+      const empty =
+        box.querySelector(
+          '.empty-state'
+        );
+
+
+      if (empty) {
+
+        box.innerHTML = '';
+
+      }
+
+
+      const div =
+        document.createElement(
+          'div'
+        );
+
+
+      div.className =
+        `msg ${role}`;
+
+
+      let meta;
+
+
+      if (
+        role === 'customer'
+      ) {
+
+        meta =
+          `Customer`;
+
+
+        if (emotion) {
+
+          meta +=
+            ` · ${emotion.label} ` +
+            `(${emotion.intensity}/10)`;
+
         }
-      } catch (e) {
-        alert('Error: ' + e.message);
-      } finally {
-        btn.disabled = false;
-      }
-    });
 
-    document.getElementById('btnAnalyze').addEventListener('click', async () => {
-      const query = document.getElementById('manualQuery').value.trim();
-      if (!query) return;
-      try {
-        const res = await fetch(`${API}/analyze`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query })
-        });
-        const data = await res.json();
-        const box = document.getElementById('analyzeResult');
-        box.classList.remove('hidden');
-        document.getElementById('analyzeBody').innerHTML = `
-          <div class="copilot-item"><strong>Intent</strong>${data.intent}</div>
-          <div class="copilot-item"><strong>Emotion</strong>${data.emotion_label} (${data.emotion_score}/10)</div>
-          <div class="copilot-item"><strong>Escalation Risk</strong>${data.escalation_risk}</div>
-          <div class="copilot-item"><strong>Coaching Guidance</strong>
-            ${data.coaching_guidance.map(c => '• ' + c).join('<br/>')}
+      }
+
+      else {
+
+        meta =
+          'Support Agent';
+
+      }
+
+
+      div.innerHTML =
+        `<div class="meta">${escapeHtml(meta)}</div>` +
+        `${escapeHtml(
+          String(text || '')
+        )}`;
+
+
+      box.appendChild(
+        div
+      );
+
+
+      box.scrollTop =
+        box.scrollHeight;
+
+    }
+
+
+    /* =====================================================
+       ESCAPE HTML
+       ===================================================== */
+
+    function escapeHtml(
+      value
+    ) {
+
+      return String(value)
+        .replace(
+          /&/g,
+          '&amp;'
+        )
+        .replace(
+          /</g,
+          '&lt;'
+        )
+        .replace(
+          />/g,
+          '&gt;'
+        )
+        .replace(
+          /"/g,
+          '&quot;'
+        )
+        .replace(
+          /'/g,
+          '&#039;'
+        );
+
+    }
+
+
+    /* =====================================================
+       COPILOT
+       ===================================================== */
+
+    function updateCopilot(
+      data
+    ) {
+
+      const panel =
+        document.getElementById(
+          'copilotPanel'
+        );
+
+
+      if (!data) {
+
+        panel.innerHTML = `
+          <div class="copilot-empty">
+            No active session
+            <br><br>
+            Start a training simulation
+            to view copilot guidance.
           </div>
         `;
-        updateCopilot({
-          emotion: { label: data.emotion_label, intensity: data.emotion_score },
-          persona: data.suggested_persona,
-          scenario: data.suggested_scenario
-        });
-      } catch (e) {
-        alert('Analyze failed: ' + e.message);
-      }
-    });
 
-    document.getElementById('btnClear').addEventListener('click', () => {
-      if (currentSessionId) {
-        fetch(`${API}/session/${currentSessionId}`, { method: 'DELETE' }).catch(()=>{});
+        return;
+
       }
-      currentSessionId = null;
-      document.getElementById('conversation').innerHTML = '<div class="empty-state">No messages in this session yet.</div>';
-      document.getElementById('agentInputArea').classList.add('hidden');
-      document.getElementById('configPanel').classList.remove('hidden');
-      document.getElementById('btnStart').classList.remove('hidden');
-      document.getElementById('sessionMeta').textContent = 'Configure and start a simulation session';
-      document.getElementById('sessionBadge').textContent = 'Session Idle';
-      setEmotionPill(null);
-      updateCopilot(null);
-      document.getElementById('manualQuery').value = '';
-      document.getElementById('analyzeResult').classList.add('hidden');
-    });
+
+
+      let html = '';
+
+
+      /* -----------------------------------------------
+         FRUSTRATION
+         ----------------------------------------------- */
+
+      if (data.emotion) {
+
+        html += `
+          <div class="copilot-item">
+
+            <strong>
+              Customer Frustration
+            </strong>
+
+            ${escapeHtml(
+              data.emotion.label
+            )}
+
+            (${Number(
+              data.emotion.intensity
+            )}/10)
+
+          </div>
+        `;
+
+      }
+
+
+      /* -----------------------------------------------
+         PERSONA
+         ----------------------------------------------- */
+
+      if (data.persona) {
+
+        html += `
+          <div class="copilot-item">
+
+            <strong>
+              Persona
+            </strong>
+
+            ${escapeHtml(
+              data.persona
+            )}
+
+          </div>
+        `;
+
+      }
+
+
+      /* -----------------------------------------------
+         SCENARIO
+         ----------------------------------------------- */
+
+      if (data.scenario) {
+
+        html += `
+          <div class="copilot-item">
+
+            <strong>
+              Scenario
+            </strong>
+
+            ${escapeHtml(
+              data.scenario
+            )}
+
+          </div>
+        `;
+
+      }
+
+
+      /* -----------------------------------------------
+         COACHING
+         ----------------------------------------------- */
+
+      html += `
+        <div class="copilot-item">
+
+          <strong>
+            Coaching Tips
+          </strong>
+
+          • Acknowledge feelings first if
+          frustration ≥ 6
+          <br>
+
+          • Give a concrete next step and timeline
+          <br>
+
+          • Avoid pure policy language when the
+          customer is angry
+          <br>
+
+          • Match your response to the customer's
+          emotional intensity
+
+        </div>
+      `;
+
+
+      panel.innerHTML =
+        html;
+
+    }
+
+
+    /* =====================================================
+       START SIMULATION
+       ===================================================== */
+
+    document
+      .getElementById(
+        'btnStart'
+      )
+      .addEventListener(
+        'click',
+        async () => {
+
+
+          /* ---------------------------------------------
+             READ FRUSTRATION LEVEL
+             --------------------------------------------- */
+
+          const input =
+            document.getElementById(
+              'cfgFrustration'
+            );
+
+
+          let frustrationLevel =
+            parseInt(
+              input.value,
+              10
+            );
+
+
+          if (
+            Number.isNaN(
+              frustrationLevel
+            )
+          ) {
+
+            frustrationLevel = 5;
+
+          }
+
+
+          frustrationLevel =
+            Math.max(
+              1,
+              Math.min(
+                10,
+                frustrationLevel
+              )
+            );
+
+
+          input.value =
+            frustrationLevel;
+
+
+          /* ---------------------------------------------
+             REQUEST BODY
+             --------------------------------------------- */
+
+          const body = {
+
+            persona:
+              document.getElementById(
+                'cfgPersona'
+              ).value,
+
+            scenario:
+              document.getElementById(
+                'cfgScenario'
+              ).value,
+
+            frustration_level:
+              frustrationLevel,
+
+            expected_resolution:
+              document.getElementById(
+                'cfgResolution'
+              ).value,
+
+            use_llm:
+              true
+
+          };
+
+
+          console.log(
+            'Starting simulation:',
+            body
+          );
+
+
+          /* ---------------------------------------------
+             BUTTON
+             --------------------------------------------- */
+
+          const button =
+            document.getElementById(
+              'btnStart'
+            );
+
+
+          button.disabled =
+            true;
+
+
+          button.textContent =
+            'Starting…';
+
+
+          try {
+
+
+            /* -------------------------------------------
+               API REQUEST
+               ------------------------------------------- */
+
+            const response =
+              await fetch(
+                `${API}/session/start`,
+                {
+
+                  method: 'POST',
+
+                  headers: {
+                    'Content-Type':
+                      'application/json'
+                  },
+
+                  body:
+                    JSON.stringify(
+                      body
+                    )
+
+                }
+              );
+
+
+            if (
+              !response.ok
+            ) {
+
+              const errorText =
+                await response.text();
+
+
+              throw new Error(
+                errorText
+              );
+
+            }
+
+
+            const data =
+              await response.json();
+
+
+            console.log(
+              'Session started:',
+              data
+            );
+
+
+            /* -------------------------------------------
+               SESSION ID
+               ------------------------------------------- */
+
+            currentSessionId =
+              data.session_id;
+
+
+            /* -------------------------------------------
+               CLEAR CONVERSATION
+               ------------------------------------------- */
+
+            document
+              .getElementById(
+                'conversation'
+              )
+              .innerHTML = '';
+
+
+            /* -------------------------------------------
+               CUSTOMER FIRST MESSAGE
+               ------------------------------------------- */
+
+            addMessage(
+              'customer',
+              data.customer_message,
+              data.emotion
+            );
+
+
+            /* -------------------------------------------
+               EMOTION
+               ------------------------------------------- */
+
+            setEmotionPill(
+              data.emotion
+            );
+
+
+            /* -------------------------------------------
+               SESSION INFO
+               ------------------------------------------- */
+
+            const actualIntensity =
+              data.emotion &&
+              data.emotion.intensity
+                ? data.emotion.intensity
+                : frustrationLevel;
+
+
+            document
+              .getElementById(
+                'sessionMeta'
+              )
+              .textContent =
+                `Session ${data.session_id} · ` +
+                `${data.persona} · ` +
+                `${data.scenario} · ` +
+                `Frustration ${actualIntensity}/10`;
+
+
+            /* -------------------------------------------
+               SESSION BADGE
+               ------------------------------------------- */
+
+            document
+              .getElementById(
+                'sessionBadge'
+              )
+              .textContent =
+                'Session Active';
+
+
+            /* -------------------------------------------
+               SHOW AGENT INPUT
+               ------------------------------------------- */
+
+            document
+              .getElementById(
+                'agentInputArea'
+              )
+              .classList.remove(
+                'hidden'
+              );
+
+
+            /* -------------------------------------------
+               HIDE CONFIG
+               ------------------------------------------- */
+
+            document
+              .getElementById(
+                'configPanel'
+              )
+              .classList.add(
+                'hidden'
+              );
+
+
+            /* -------------------------------------------
+               HIDE START BUTTON
+               ------------------------------------------- */
+
+            button.classList.add(
+              'hidden'
+            );
+
+
+            /* -------------------------------------------
+               COPILOT
+               ------------------------------------------- */
+
+            updateCopilot(
+              data
+            );
+
+
+          } catch (error) {
+
+            console.error(
+              'Failed to start:',
+              error
+            );
+
+
+            alert(
+              'Failed to start simulation:\n\n' +
+              error.message
+            );
+
+          } finally {
+
+            button.disabled =
+              false;
+
+            button.textContent =
+              'Start Simulation';
+
+          }
+
+        }
+      );
+
+
+    /* =====================================================
+       SEND AGENT REPLY
+       ===================================================== */
+
+    document
+      .getElementById(
+        'btnSend'
+      )
+      .addEventListener(
+        'click',
+        async () => {
+
+
+          const textarea =
+            document.getElementById(
+              'agentMsg'
+            );
+
+
+          const message =
+            textarea.value.trim();
+
+
+          if (
+            !message ||
+            !currentSessionId
+          ) {
+
+            return;
+
+          }
+
+
+          const button =
+            document.getElementById(
+              'btnSend'
+            );
+
+
+          button.disabled =
+            true;
+
+
+          /* ---------------------------------------------
+             DISPLAY AGENT MESSAGE
+             --------------------------------------------- */
+
+          addMessage(
+            'agent',
+            message
+          );
+
+
+          textarea.value =
+            '';
+
+
+          try {
+
+
+            const response =
+              await fetch(
+                `${API}/session/respond`,
+                {
+
+                  method: 'POST',
+
+                  headers: {
+                    'Content-Type':
+                      'application/json'
+                  },
+
+                  body:
+                    JSON.stringify({
+
+                      session_id:
+                        currentSessionId,
+
+                      message:
+                        message
+
+                    })
+
+                }
+              );
+
+
+            if (
+              !response.ok
+            ) {
+
+              const errorText =
+                await response.text();
+
+
+              throw new Error(
+                errorText
+              );
+
+            }
+
+
+            const data =
+              await response.json();
+
+
+            console.log(
+              'Customer response:',
+              data
+            );
+
+
+            /* -------------------------------------------
+               CUSTOMER RESPONSE
+               ------------------------------------------- */
+
+            addMessage(
+              'customer',
+              data.customer_message,
+              data.emotion
+            );
+
+
+            /* -------------------------------------------
+               UPDATE FRUSTRATION
+               ------------------------------------------- */
+
+            setEmotionPill(
+              data.emotion
+            );
+
+
+            /* -------------------------------------------
+               UPDATE COPILOT
+               ------------------------------------------- */
+
+            updateCopilot(
+              data
+            );
+
+
+            /* -------------------------------------------
+               SESSION FINISHED
+               ------------------------------------------- */
+
+            if (
+              data.finished
+            ) {
+
+              document
+                .getElementById(
+                  'sessionBadge'
+                )
+                .textContent =
+                  'Session Resolved';
+
+
+              button.textContent =
+                'Session Finished';
+
+            }
+
+
+          } catch (error) {
+
+            console.error(
+              'Response error:',
+              error
+            );
+
+
+            alert(
+              'Error getting customer response:\n\n' +
+              error.message
+            );
+
+          } finally {
+
+            button.disabled =
+              false;
+
+          }
+
+        }
+      );
+
+
+    /* =====================================================
+       ENTER KEY SUPPORT
+       ===================================================== */
+
+    document
+      .getElementById(
+        'agentMsg'
+      )
+      .addEventListener(
+        'keydown',
+        event => {
+
+          if (
+            event.key === 'Enter' &&
+            event.ctrlKey
+          ) {
+
+            event.preventDefault();
+
+            document
+              .getElementById(
+                'btnSend'
+              )
+              .click();
+
+          }
+
+        }
+      );
+
+
+    /* =====================================================
+       MANUAL ANALYSIS
+       ===================================================== */
+
+    document
+      .getElementById(
+        'btnAnalyze'
+      )
+      .addEventListener(
+        'click',
+        async () => {
+
+
+          const query =
+            document
+              .getElementById(
+                'manualQuery'
+              )
+              .value
+              .trim();
+
+
+          if (!query) {
+
+            return;
+
+          }
+
+
+          const button =
+            document.getElementById(
+              'btnAnalyze'
+            );
+
+
+          button.disabled =
+            true;
+
+
+          button.textContent =
+            'Analyzing…';
+
+
+          try {
+
+
+            const response =
+              await fetch(
+                `${API}/analyze`,
+                {
+
+                  method: 'POST',
+
+                  headers: {
+                    'Content-Type':
+                      'application/json'
+                  },
+
+                  body:
+                    JSON.stringify({
+                      query: query
+                    })
+
+                }
+              );
+
+
+            if (
+              !response.ok
+            ) {
+
+              throw new Error(
+                await response.text()
+              );
+
+            }
+
+
+            const data =
+              await response.json();
+
+
+            const result =
+              document.getElementById(
+                'analyzeResult'
+              );
+
+
+            result.classList.remove(
+              'hidden'
+            );
+
+
+            let coachingHtml =
+              '';
+
+
+            if (
+              data.coaching_guidance &&
+              data.coaching_guidance.length
+            ) {
+
+              coachingHtml =
+                data.coaching_guidance
+                  .map(
+                    item =>
+                      `• ${escapeHtml(item)}`
+                  )
+                  .join(
+                    '<br>'
+                  );
+
+            }
+
+            else {
+
+              coachingHtml =
+                'No specific coaching guidance.';
+
+            }
+
+
+            document
+              .getElementById(
+                'analyzeBody'
+              )
+              .innerHTML = `
+
+                <div class="copilot-item">
+
+                  <strong>
+                    Intent
+                  </strong>
+
+                  ${escapeHtml(
+                    data.intent
+                  )}
+
+                </div>
+
+
+                <div class="copilot-item">
+
+                  <strong>
+                    Customer Frustration
+                  </strong>
+
+                  ${escapeHtml(
+                    data.frustration_label ||
+                    data.emotion_label ||
+                    'unknown'
+                  )}
+
+                  (${Number(
+                    data.frustration_level ||
+                    data.emotion_score ||
+                    0
+                  )}/10)
+
+                </div>
+
+
+                <div class="copilot-item">
+
+                  <strong>
+                    Escalation Risk
+                  </strong>
+
+                  ${escapeHtml(
+                    data.escalation_risk
+                  )}
+
+                </div>
+
+
+                <div class="copilot-item">
+
+                  <strong>
+                    Coaching Guidance
+                  </strong>
+
+                  ${coachingHtml}
+
+                </div>
+
+              `;
+
+
+          } catch (error) {
+
+            console.error(
+              'Analysis error:',
+              error
+            );
+
+
+            alert(
+              'Analysis failed:\n\n' +
+              error.message
+            );
+
+          } finally {
+
+            button.disabled =
+              false;
+
+            button.textContent =
+              'Analyze Message';
+
+          }
+
+        }
+      );
+
+
+    /* =====================================================
+       CLEAR SESSION
+       ===================================================== */
+
+    document
+      .getElementById(
+        'btnClear'
+      )
+      .addEventListener(
+        'click',
+        () => {
+
+          currentSessionId =
+            null;
+
+
+          document
+            .getElementById(
+              'conversation'
+            )
+            .innerHTML = `
+
+              <div class="empty-state">
+
+                No messages in this session yet.
+
+              </div>
+
+            `;
+
+
+          document
+            .getElementById(
+              'agentInputArea'
+            )
+            .classList.add(
+              'hidden'
+            );
+
+
+          document
+            .getElementById(
+              'configPanel'
+            )
+            .classList.remove(
+              'hidden'
+            );
+
+
+          const startButton =
+            document.getElementById(
+              'btnStart'
+            );
+
+
+          startButton.classList.remove(
+            'hidden'
+          );
+
+
+          startButton.disabled =
+            false;
+
+
+          startButton.textContent =
+            'Start Simulation';
+
+
+          document
+            .getElementById(
+              'sessionBadge'
+            )
+            .textContent =
+              'Session Idle';
+
+
+          document
+            .getElementById(
+              'sessionMeta'
+            )
+            .textContent =
+              'Configure persona, scenario, and customer frustration level.';
+
+
+          document
+            .getElementById(
+              'emotionPill'
+            )
+            .textContent =
+              '–';
+
+
+          document
+            .getElementById(
+              'copilotPanel'
+            )
+            .innerHTML = `
+
+              <div class="copilot-empty">
+
+                No active session
+
+                <br><br>
+
+                Start a training simulation
+                to view copilot guidance.
+
+              </div>
+
+            `;
+
+
+          document
+            .getElementById(
+              'agentMsg'
+            )
+            .value = '';
+
+        }
+      );
+
+
+    /* =====================================================
+       REPLAY LIST
+       ===================================================== */
 
     async function loadReplayList() {
-      const el = document.getElementById('replayList');
+
+      const list =
+        document.getElementById(
+          'replayList'
+        );
+
+
       try {
-        const res = await fetch(`${API}/sessions`);
-        const data = await res.json();
-        if (data.count === 0) {
-          el.textContent = 'No active sessions. Finished sessions are saved under /logs on the server.';
-          return;
+
+        const response =
+          await fetch(
+            `${API}/sessions`
+          );
+
+
+        if (!response.ok) {
+
+          throw new Error(
+            'Could not load sessions'
+          );
+
         }
-        el.innerHTML = data.active.map(id =>
-          `<div style="padding:6px 0;border-bottom:1px solid #e2e8f0">
-            <a href="${API}/session/${id}/log" target="_blank">Session ${id}</a>
-          </div>`
-        ).join('');
-      } catch (e) {
-        el.textContent = 'Could not load sessions.';
+
+
+        const data =
+          await response.json();
+
+
+        if (
+          !data.active ||
+          data.active.length === 0
+        ) {
+
+          list.textContent =
+            'No active sessions.';
+
+          return;
+
+        }
+
+
+        list.innerHTML =
+          data.active
+            .map(
+              session =>
+                `<div
+                  style="
+                    padding:8px 0;
+                    border-bottom:1px solid #e2e8f0
+                  "
+                >
+                  ${escapeHtml(session)}
+                </div>`
+            )
+            .join('');
+
+
+      } catch (error) {
+
+        console.error(
+          'Replay error:',
+          error
+        );
+
+
+        list.textContent =
+          'Unable to load sessions.';
+
       }
+
     }
+
   </script>
+
 </body>
+
 </html>

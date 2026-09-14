@@ -3,4 +3,4 @@ venv/
 __pycache__/
 *.pyc
 .env
-vector_db/
+vector_db/customer_simulator/logs/
