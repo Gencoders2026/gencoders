@@ -1,0 +1,54 @@
+{
+  "meta": {
+    "session_id": "c891f943",
+    "started_at": "2026-09-11T14:35:16.740982Z",
+    "ended_at": null,
+    "config": {
+      "persona": "angry",
+      "scenario": "refund_request",
+      "initial_emotion": "angry",
+      "issue_severity": 7,
+      "patience_level": 5,
+      "expected_resolution": "full_refund",
+      "use_llm": true
+    },
+    "final_emotion": null,
+    "turn_count": 3
+  },
+  "conversation": [
+    {
+      "turn": 1,
+      "timestamp": "2026-09-11T14:35:18.265963Z",
+      "role": "customer",
+      "message": "I want a FULL REFUND for order ORD-78421 RIGHT NOW. The Wireless Noise-Cancelling Headphones is cracked and unusable. $149.99 back to my card!",
+      "emotion": {
+        "intensity": 8,
+        "label": "angry",
+        "history": [
+          "init → 8 (angry)"
+        ]
+      }
+    },
+    {
+      "turn": 2,
+      "timestamp": "2026-09-11T14:36:09.641663Z",
+      "role": "agent",
+      "message": "“I’m really sorry about the damaged product. I am processing a full refund of $149.99 to your original payment method. You will receive it in 3–5 business days. Your refund reference is RF-48291.”",
+      "emotion": null
+    },
+    {
+      "turn": 3,
+      "timestamp": "2026-09-11T14:36:10.184914Z",
+      "role": "customer",
+      "message": "I already explained the problem. Can you please give me a clear next step and a timeline?",
+      "emotion": {
+        "intensity": 7,
+        "label": "angry",
+        "history": [
+          "init → 8 (angry)",
+          "angry(8) → angry(7) [Δ-1]"
+        ]
+      }
+    }
+  ]
+}
