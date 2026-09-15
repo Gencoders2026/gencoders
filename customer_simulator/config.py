@@ -7,11 +7,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # OpenAI / LLM settings
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+# Groq / LLM settings
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.1-8b-instant")
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.85"))
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "250"))
-
 # Simulator defaults
 DEFAULT_PERSONA = "frustrated"
 DEFAULT_SCENARIO = "refund_request"

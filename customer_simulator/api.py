@@ -2,14 +2,12 @@
 FastAPI interface for the Customer Simulator Agent.
 """
 
-import os
-from typing import Optional, Dict, Any
-from pathlib import Path
+"""
+FastAPI interface for the Customer Simulator Agent.
+"""
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-<<<<<<< HEAD
 import os
+import sys
 from typing import Optional, Dict, Any
 from pathlib import Path
 
@@ -19,12 +17,20 @@ from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+RAG_DIR = Path(__file__).resolve().parent.parent / "rag"
+
+if str(RAG_DIR) not in sys.path:
+    sys.path.insert(0, str(RAG_DIR))
+
+from retriever import semantic_search
+
 from .simulator import CustomerSimulator, create_simulator
 from .personas import list_personas
 from .scenarios import list_scenarios
 from .config import API_HOST, API_PORT, LOG_DIR
->>>>>>> main
 
+FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
+INDEX_PATH = FRONTEND_DIR / "index.html"
 app = FastAPI(
     title="Customer Simulator Agent API",
     description="Simulate realistic customer conversations for support training & testing.",
@@ -167,54 +173,308 @@ def list_sessions():
 
 @app.post("/analyze")
 def analyze_customer_message(req: ManualAnalyzeRequest):
-    text = req.query.lower()
+    text = req.query.lower().strip()
+
+    # =========================================================
+    # 1. INTENT DETECTION
+    # =========================================================
 
     intent = "general_inquiry"
-    if any(w in text for w in ["refund", "money back", "return"]):
+
+    if any(word in text for word in [
+        "refund",
+        "money back",
+        "return my money"
+    ]):
         intent = "refund_request"
-    elif any(w in text for w in ["late", "delayed", "not arrived", "tracking"]):
-        intent = "delayed_order"
-    elif any(w in text for w in ["payment", "charged", "declined", "card"]):
-        intent = "payment_failure"
-    elif any(w in text for w in ["login", "password", "locked", "account"]):
-        intent = "account_issue"
-    elif any(w in text for w in ["cancel", "unsubscribe", "stop billing"]):
+
+    elif any(word in text for word in [
+        "cancel",
+        "cancellation",
+        "unsubscribe",
+        "stop billing"
+    ]):
         intent = "cancellation"
 
+    elif any(word in text for word in [
+        "late",
+        "delayed",
+        "not arrived",
+        "tracking",
+        "delivery",
+        "shipment",
+        "where is my order"
+    ]):
+        intent = "delayed_order"
+
+    elif any(word in text for word in [
+        "payment",
+        "charged",
+        "declined",
+        "card",
+        "transaction"
+    ]):
+        intent = "payment_failure"
+
+    elif any(word in text for word in [
+        "login",
+        "password",
+        "locked",
+        "account",
+        "sign in"
+    ]):
+        intent = "account_issue"
+
+    elif any(word in text for word in [
+        "return",
+        "exchange",
+        "replace",
+        "replacement"
+    ]):
+        intent = "return_exchange"
+
+    elif any(word in text for word in [
+        "complaint",
+        "complain",
+        "terrible service",
+        "bad service"
+    ]):
+        intent = "complaint"
+
+    # =========================================================
+    # 2. EMOTION + FRUSTRATION
+    # =========================================================
+
     emotion_score = 5
-    if any(w in text for w in ["furious", "ridiculous", "unacceptable", "now!", "manager"]):
+
+    if any(word in text for word in [
+        "furious",
+        "ridiculous",
+        "unacceptable",
+        "immediately",
+        "manager",
+        "escalating",
+        "worst",
+        "horrible"
+    ]):
         emotion_score = 9
-    elif any(w in text for w in ["angry", "frustrated", "upset", "not happy"]):
+
+    elif any(word in text for word in [
+        "angry",
+        "frustrated",
+        "upset",
+        "annoyed",
+        "not happy",
+        "disappointed"
+    ]):
         emotion_score = 7
-    elif any(w in text for w in ["please", "thank", "appreciate", "kindly"]):
+
+    elif any(word in text for word in [
+        "confused",
+        "don't understand",
+        "not sure",
+        "unclear"
+    ]):
+        emotion_score = 6
+
+    elif any(word in text for word in [
+        "worried",
+        "concerned",
+        "concern"
+    ]):
+        emotion_score = 6
+
+    elif any(word in text for word in [
+        "please",
+        "thank",
+        "thanks",
+        "appreciate",
+        "kindly"
+    ]):
         emotion_score = 3
 
+    # =========================================================
+    # 3. EMOTION LABEL
+    # =========================================================
+
+    if emotion_score >= 9:
+        emotion_label = "angry"
+
+    elif emotion_score >= 7:
+        emotion_label = "frustrated"
+
+    elif emotion_score == 6:
+        emotion_label = "worried"
+
+    elif emotion_score <= 3:
+        emotion_label = "happy"
+
+    else:
+        emotion_label = "neutral"
+
+    # =========================================================
+    # 4. SENTIMENT
+    # =========================================================
+
+    if emotion_score >= 6:
+        sentiment = "Negative"
+
+    elif emotion_score <= 3:
+        sentiment = "Positive"
+
+    else:
+        sentiment = "Neutral"
+
+    # =========================================================
+    # 5. FRUSTRATION LEVEL
+    # =========================================================
+
+    frustration_level = emotion_score
+
+    # =========================================================
+    # 6. ESCALATION RISK
+    # =========================================================
+
     escalation_risk = "low"
+
     if emotion_score >= 8:
         escalation_risk = "high"
+
     elif emotion_score >= 6:
         escalation_risk = "medium"
 
-    coaching = []
+    # Explicit escalation language always means high risk
+    if any(word in text for word in [
+        "manager",
+        "escalating",
+        "escalate",
+        "supervisor",
+        "legal action"
+    ]):
+        escalation_risk = "high"
+
+    # =========================================================
+    # 7. SATISFACTION TREND
+    # =========================================================
+
     if emotion_score >= 7:
-        coaching.append("Acknowledge the customer's frustration first.")
-        coaching.append("Offer a concrete next step and timeline.")
-    if intent == "refund_request":
-        coaching.append("Confirm order details and state the refund policy clearly.")
+        satisfaction_trend = "Declining"
+
+    elif emotion_score <= 3:
+        satisfaction_trend = "Improving"
+
+    else:
+        satisfaction_trend = "Stable"
+
+    # =========================================================
+    # 8. CONFIDENCE
+    # =========================================================
+
+    confidence = 0.85
+
+    if intent == "general_inquiry":
+        confidence = 0.65
+
     if escalation_risk == "high":
-        coaching.append("Consider offering escalation to a supervisor early.")
+        confidence = max(confidence, 0.90)
+
+    # =========================================================
+    # 9. COACHING GUIDANCE
+    # =========================================================
+
+    coaching = []
+
+    if emotion_score >= 7:
+        coaching.append(
+            "Acknowledge the customer's frustration first."
+        )
+
+        coaching.append(
+            "Offer a concrete next step and timeline."
+        )
+
+    if intent == "refund_request":
+        coaching.append(
+            "Confirm order details and state the refund policy clearly."
+        )
+
+    if intent == "delayed_order":
+        coaching.append(
+            "Check the latest tracking information and provide a realistic delivery update."
+        )
+
+    if intent == "payment_failure":
+        coaching.append(
+            "Verify the payment status and explain the next resolution step."
+        )
+
+    if intent == "account_issue":
+        coaching.append(
+            "Verify the account issue and guide the customer through the recovery steps."
+        )
+
+    if escalation_risk == "high":
+        coaching.append(
+            "Consider offering escalation to a supervisor early."
+        )
+
+    # =========================================================
+    # 10. RAG WITH SCENARIO CONTEXT
+    # =========================================================
+
+    rag_query = f"{req.scenario_hint or ''} {req.query}".strip()
+
+    try:
+        rag_results = semantic_search(
+            rag_query,
+            top_k=3
+        )
+    except FileNotFoundError:
+        rag_results = []
+
+    # =========================================================
+    # 11. FINAL STRUCTURED RESPONSE
+    # =========================================================
 
     return {
         "query": req.query,
-        "intent": intent,
-        "emotion_score": emotion_score,
-        "emotion_label": "angry" if emotion_score >= 7 else ("frustrated" if emotion_score >= 5 else "calm"),
-        "escalation_risk": escalation_risk,
-        "coaching_guidance": coaching,
-        "suggested_persona": req.persona_hint or ("angry" if emotion_score >= 7 else "frustrated"),
-        "suggested_scenario": req.scenario_hint or intent,
-    }
 
+        "intent": intent,
+
+        "emotion": emotion_label,
+
+        "emotion_label": emotion_label,
+
+        "sentiment": sentiment,
+
+        "emotion_score": emotion_score,
+
+        "frustration_level": frustration_level,
+
+        "satisfaction_trend": satisfaction_trend,
+
+        "escalation_risk": escalation_risk,
+
+        "confidence": confidence,
+
+        "coaching_guidance": coaching,
+
+        "suggested_persona": (
+            req.persona_hint
+            or (
+                "angry"
+                if emotion_score >= 7
+                else "frustrated"
+            )
+        ),
+
+        "suggested_scenario": (
+            req.scenario_hint
+            or intent
+        ),
+
+        "knowledge_results": rag_results,
+    }
 
 if __name__ == "__main__":
     import uvicorn

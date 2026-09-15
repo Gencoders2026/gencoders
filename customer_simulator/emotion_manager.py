@@ -6,7 +6,7 @@ from typing import Dict, Optional
 from dataclasses import dataclass, field
 import re
 
-from config import EMOTION_SCALE_MIN, EMOTION_SCALE_MAX
+from .config import EMOTION_SCALE_MIN, EMOTION_SCALE_MAX
 
 
 EMOTION_LABELS = {

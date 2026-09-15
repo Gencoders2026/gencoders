@@ -14,12 +14,12 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 try:
-    from openai import OpenAI
+    from groq import Groq
 except ImportError:
-    OpenAI = None  # type: ignore
+    Groq = None  # type: ignore
 
 from .config import (
-    OPENAI_API_KEY,
+    GROQ_API_KEY,
     LLM_MODEL,
     LLM_TEMPERATURE,
     MAX_TOKENS,
@@ -55,7 +55,7 @@ class CustomerSimulator:
         self.issue_severity = max(1, min(10, issue_severity))
         self.patience_level = max(1, min(10, patience_level))
         self.expected_resolution = expected_resolution
-        self.use_llm = use_llm and bool(OPENAI_API_KEY) and OpenAI is not None
+        self.use_llm = use_llm and bool(GROQ_API_KEY) and Groq is not None
 
         self.persona = get_persona(self.persona_name)
         self.scenario = get_scenario(self.scenario_name)
@@ -83,7 +83,7 @@ class CustomerSimulator:
 
         self.client = None
         if self.use_llm:
-            self.client = OpenAI(api_key=OPENAI_API_KEY)
+            self.client = Groq(api_key=GROQ_API_KEY)
 
     def start(self) -> Dict[str, Any]:
         opening = self._generate_customer_message(is_opening=True)

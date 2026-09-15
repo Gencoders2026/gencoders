@@ -4,12 +4,11 @@ import faiss
 import numpy as np
 
 
-VECTOR_DB_PATH = "vector_db"
-INDEX_PATH = os.path.join(
-    VECTOR_DB_PATH,
-    "index.faiss"
-)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+VECTOR_DB_PATH = os.path.join(BASE_DIR, "vector_db")
 
+INDEX_PATH = os.path.join(VECTOR_DB_PATH, "index.faiss")
+METADATA_PATH = os.path.join(VECTOR_DB_PATH, "metadata.pkl")
 METADATA_PATH = os.path.join(
     VECTOR_DB_PATH,
     "metadata.pkl"
