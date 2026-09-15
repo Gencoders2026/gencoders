@@ -1,1789 +1,855 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
 <meta charset="UTF-8">
-
-<meta
-name="viewport"
-content="width=device-width, initial-scale=1.0"
->
-
-<title>
-Customer Support Coaching Assistant
-</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Support Coaching Assistant</title>
 
 <style>
-
 * {
     box-sizing: border-box;
 }
 
 body {
-
     margin: 0;
-
-    font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
-
-    background:
-        #f4f7fb;
-
-    color:
-        #17233c;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f4f7fb;
+    color: #17233c;
 }
-
 
 header {
-
-    background:
-        white;
-
-    padding:
-        18px 30px;
-
-    border-bottom:
-        1px solid #dfe5ef;
-
-    display:
-        flex;
-
-    justify-content:
-        space-between;
-
-    align-items:
-        center;
+    background: white;
+    padding: 18px 30px;
+    border-bottom: 1px solid #dfe5ef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
-
 
 .logo {
-
-    font-size:
-        24px;
-
-    font-weight:
-        700;
+    font-size: 24px;
+    font-weight: 700;
 }
-
 
 .status {
-
-    padding:
-        9px 16px;
-
-    border-radius:
-        20px;
-
-    background:
-        #e8fff1;
-
-    color:
-        #008542;
-
-    font-weight:
-        600;
+    padding: 9px 16px;
+    border-radius: 20px;
+    background: #e8fff1;
+    color: #008542;
+    font-weight: 600;
 }
-
 
 .layout {
-
-    display:
-        grid;
-
-    grid-template-columns:
-        220px 1fr;
-
-    min-height:
-        calc(100vh - 70px);
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: calc(100vh - 70px);
 }
-
 
 .sidebar {
-
-    background:
-        white;
-
-    border-right:
-        1px solid #dfe5ef;
-
-    padding:
-        25px 16px;
+    background: white;
+    border-right: 1px solid #dfe5ef;
+    padding: 25px 16px;
 }
-
 
 .sidebar h3 {
-
-    font-size:
-        13px;
-
-    color:
-        #738099;
-
-    margin-top:
-        10px;
+    font-size: 13px;
+    color: #738099;
+    margin-top: 10px;
 }
-
 
 .nav {
-
-    padding:
-        13px;
-
-    margin:
-        8px 0;
-
-    border-radius:
-        10px;
-
-    cursor:
-        pointer;
+    padding: 13px;
+    margin: 8px 0;
+    border-radius: 10px;
+    cursor: pointer;
 }
-
 
 .nav.active {
-
-    background:
-        #e8f1ff;
-
-    color:
-        #1667e8;
-
-    font-weight:
-        700;
+    background: #e8f1ff;
+    color: #1667e8;
+    font-weight: 700;
 }
-
 
 .main {
-
-    padding:
-        30px;
-
-    max-width:
-        1500px;
-
-    width:
-        100%;
-
-    margin:
-        auto;
+    padding: 30px;
+    max-width: 1500px;
+    width: 100%;
+    margin: auto;
 }
-
 
 .title {
-
-    margin-bottom:
-        22px;
+    margin-bottom: 22px;
 }
-
 
 .title h1 {
-
-    margin:
-        0 0 6px;
-
-    font-size:
-        28px;
+    margin: 0 0 6px;
+    font-size: 28px;
 }
-
 
 .title p {
-
-    margin:
-        0;
-
-    color:
-        #71809a;
+    margin: 0;
+    color: #71809a;
 }
-
 
 .card {
-
-    background:
-        white;
-
-    border-radius:
-        16px;
-
-    padding:
-        24px;
-
-    margin-bottom:
-        22px;
-
-    box-shadow:
-        0 3px 15px rgba(
-            30,
-            50,
-            80,
-            0.06
-        );
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 22px;
+    box-shadow: 0 3px 15px rgba(30, 50, 80, 0.06);
 }
-
 
 .grid {
-
-    display:
-        grid;
-
-    grid-template-columns:
-        1fr 1fr;
-
-    gap:
-        18px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
 }
-
 
 label {
-
-    display:
-        block;
-
-    font-weight:
-        700;
-
-    margin-bottom:
-        8px;
+    display: block;
+    font-weight: 700;
+    margin-bottom: 8px;
 }
-
 
 select,
 textarea {
-
-    width:
-        100%;
-
-    padding:
-        13px;
-
-    border:
-        1px solid #ccd5e2;
-
-    border-radius:
-        9px;
-
-    font-size:
-        15px;
-
-    background:
-        white;
+    width: 100%;
+    padding: 13px;
+    border: 1px solid #ccd5e2;
+    border-radius: 9px;
+    font-size: 15px;
+    background: white;
 }
-
 
 input[type="range"] {
-
-    width:
-        100%;
+    width: 100%;
 }
-
 
 .levelBox {
-
-    background:
-        #f7f9fc;
-
-    border:
-        1px solid #dfe6f0;
-
-    padding:
-        15px;
-
-    border-radius:
-        10px;
-
-    margin-top:
-        10px;
+    background: #f7f9fc;
+    border: 1px solid #dfe6f0;
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 10px;
 }
-
 
 .levelTitle {
-
-    font-weight:
-        700;
-
-    margin-bottom:
-        7px;
+    font-weight: 700;
+    margin-bottom: 7px;
 }
-
 
 .levelDescription {
-
-    color:
-        #65748b;
-
-    font-size:
-        14px;
+    color: #65748b;
+    font-size: 14px;
 }
-
 
 button {
-
-    border:
-        none;
-
-    border-radius:
-        10px;
-
-    padding:
-        14px 20px;
-
-    font-size:
-        16px;
-
-    font-weight:
-        700;
-
-    cursor:
-        pointer;
+    border: none;
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
 }
-
 
 .startBtn {
-
-    width:
-        100%;
-
-    background:
-        #18263f;
-
-    color:
-        white;
-
-    margin-top:
-        20px;
+    width: 100%;
+    background: #18263f;
+    color: white;
+    margin-top: 20px;
 }
-
 
 .startBtn:hover {
-
-    background:
-        #263a5d;
+    background: #263a5d;
 }
-
 
 .activeHeader {
-
-    display:
-        grid;
-
-    grid-template-columns:
-        repeat(4, 1fr);
-
-    gap:
-        15px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
 }
-
 
 .info {
-
-    background:
-        #f7f9fc;
-
-    border:
-        1px solid #dfe6f0;
-
-    border-radius:
-        12px;
-
-    padding:
-        18px;
+    background: #f7f9fc;
+    border: 1px solid #dfe6f0;
+    border-radius: 12px;
+    padding: 18px;
 }
-
 
 .info small {
-
-    display:
-        block;
-
-    color:
-        #738099;
-
-    margin-bottom:
-        7px;
+    display: block;
+    color: #738099;
+    margin-bottom: 7px;
 }
-
 
 .info strong {
-
-    font-size:
-        17px;
+    font-size: 17px;
 }
-
 
 .conversationLayout {
-
-    display:
-        grid;
-
-    grid-template-columns:
-        2fr 1fr;
-
-    gap:
-        22px;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 22px;
 }
-
 
 .chat {
-
-    background:
-        #f7f9fc;
-
-    border:
-        1px solid #e0e7f0;
-
-    border-radius:
-        12px;
-
-    padding:
-        18px;
-
-    min-height:
-        400px;
-
-    max-height:
-        520px;
-
-    overflow-y:
-        auto;
+    background: #f7f9fc;
+    border: 1px solid #e0e7f0;
+    border-radius: 12px;
+    padding: 18px;
+    min-height: 400px;
+    max-height: 520px;
+    overflow-y: auto;
 }
-
 
 .message {
-
-    padding:
-        15px 18px;
-
-    border-radius:
-        12px;
-
-    margin-bottom:
-        14px;
-
-    line-height:
-        1.5;
+    padding: 15px 18px;
+    border-radius: 12px;
+    margin-bottom: 14px;
+    line-height: 1.5;
 }
-
 
 .customer {
-
-    background:
-        #e8f1ff;
-
-    border-left:
-        4px solid #2674e8;
-
+    background: #e8f1ff;
+    border-left: 4px solid #2674e8;
 }
-
 
 .agent {
-
-    background:
-        #eef1f5;
-
-    border-left:
-        4px solid #78869b;
-
-    margin-left:
-        35px;
+    background: #eef1f5;
+    border-left: 4px solid #78869b;
+    margin-left: 35px;
 }
-
 
 .messageHeader {
-
-    font-weight:
-        700;
-
-    margin-bottom:
-        7px;
+    font-weight: 700;
+    margin-bottom: 7px;
 }
-
 
 .badge {
-
-    display:
-        inline-block;
-
-    padding:
-        4px 9px;
-
-    border-radius:
-        15px;
-
-    font-size:
-        12px;
-
-    margin-left:
-        8px;
-
-    background:
-        #ffe2e2;
-
-    color:
-        #c53030;
+    display: inline-block;
+    padding: 4px 9px;
+    border-radius: 15px;
+    font-size: 12px;
+    margin-left: 8px;
+    background: #ffe2e2;
+    color: #c53030;
 }
-
 
 .replyBox {
-
-    margin-top:
-        18px;
+    margin-top: 18px;
 }
-
 
 .sendBtn {
-
-    width:
-        100%;
-
-    background:
-        #18263f;
-
-    color:
-        white;
-
-    margin-top:
-        10px;
+    width: 100%;
+    background: #18263f;
+    color: white;
+    margin-top: 10px;
 }
-
 
 .copilot {
-
-    background:
-        #f7f9fc;
-
-    border:
-        1px solid #e0e7f0;
-
-    border-radius:
-        12px;
-
-    padding:
-        18px;
+    background: #f7f9fc;
+    border: 1px solid #e0e7f0;
+    border-radius: 12px;
+    padding: 18px;
 }
-
 
 .copilotBox {
-
-    background:
-        white;
-
-    border:
-        1px solid #dfe6f0;
-
-    padding:
-        15px;
-
-    border-radius:
-        10px;
-
-    margin-bottom:
-        13px;
+    background: white;
+    border: 1px solid #dfe6f0;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 13px;
 }
-
 
 .copilotBox h4 {
-
-    margin:
-        0 0 8px;
-
+    margin: 0 0 8px;
 }
-
 
 .copilotBox p {
-
-    margin:
-        0;
-
-    color:
-        #52627a;
-
+    margin: 0;
+    color: #52627a;
 }
-
 
 .success {
-
-    color:
-        #008542;
-
-    font-weight:
-        700;
-
-    margin-top:
-        12px;
+    color: #008542;
+    font-weight: 700;
+    margin-top: 12px;
 }
-
 
 .hidden {
-
-    display:
-        none;
+    display: none;
 }
 
-
 @media(max-width: 900px) {
-
     .layout {
-
-        grid-template-columns:
-            1fr;
+        grid-template-columns: 1fr;
     }
 
     .sidebar {
-
-        display:
-            none;
+        display: none;
     }
 
     .grid,
     .activeHeader,
     .conversationLayout {
-
-        grid-template-columns:
-            1fr;
+        grid-template-columns: 1fr;
     }
 }
-
 </style>
-
 </head>
-
 
 <body>
 
-
 <header>
-
-    <div class="logo">
-        🎧 Support Console
-    </div>
-
-    <div
-        id="status"
-        class="status"
-    >
-        ● Session Idle
-    </div>
-
+    <div class="logo">🎧 Support Console</div>
+    <div id="status" class="status">● Session Idle</div>
 </header>
-
 
 <div class="layout">
 
-
 <aside class="sidebar">
+    <h3>WORKSPACE MODE</h3>
 
-    <h3>
-        WORKSPACE MODE
-    </h3>
-
-    <div class="nav active">
+    <div class="nav active" id="nav-live" onclick="switchMode('live')">
         ◉ Live Simulator
     </div>
 
-    <div class="nav">
+    <div class="nav" id="nav-manual" onclick="switchMode('manual')">
         ○ Manual Analysis
     </div>
 
-    <div class="nav">
+    <div class="nav" id="nav-replay" onclick="switchMode('replay')">
         ○ Replay Library
     </div>
 
-    <h3>
-        CUSTOMER SIMULATION
-    </h3>
-
-    <p style="
-        color:#66758c;
-        line-height:1.5;
-        font-size:14px;
-    ">
-        Select a persona, scenario and
-        frustration level to simulate
-        realistic customer conversations.
+    <h3>CUSTOMER SIMULATION</h3>
+    <p style="color:#66758c; line-height:1.5; font-size:14px;">
+        Select a persona, scenario and frustration level to simulate realistic customer conversations.
     </p>
-
 </aside>
-
 
 <main class="main">
 
+    <!-- ======================= LIVE SIMULATOR ======================= -->
+    <div id="mode-live">
 
-<div class="title">
-
-    <h1>
-        Live Customer Simulator
-    </h1>
-
-    <p>
-        Train support agents using different customer personas,
-        scenarios and frustration levels.
-    </p>
-
-</div>
-
-
-<!-- =====================================================
-     CONFIGURATION
-====================================================== -->
-
-<div class="card">
-
-    <h2>
-        ⚙️ Conversation Setup
-    </h2>
-
-    <div class="grid">
-
-
-        <div>
-
-            <label>
-                Customer Persona
-            </label>
-
-            <select id="persona">
-
-                <option value="polite">
-                    Polite Customer
-                </option>
-
-                <option value="concerned">
-                    Concerned Customer
-                </option>
-
-                <option
-                    value="frustrated"
-                    selected
-                >
-                    Frustrated Customer
-                </option>
-
-                <option value="angry">
-                    Angry Customer
-                </option>
-
-                <option value="furious">
-                    Furious Customer
-                </option>
-
-            </select>
-
+        <div class="title">
+            <h1>Live Customer Simulator</h1>
+            <p>Train support agents using different customer personas, scenarios and frustration levels.</p>
         </div>
 
+        <!-- CONFIGURATION -->
+        <div class="card">
+            <h2>⚙️ Conversation Setup</h2>
 
-        <div>
-
-            <label>
-                Customer Scenario
-            </label>
-
-            <select id="scenario">
-
-                <option
-                    value="refund_request"
-                    selected
-                >
-                    Refund Request
-                </option>
-
-                <option value="delayed_order">
-                    Delayed Order
-                </option>
-
-                <option value="payment_failure">
-                    Payment Failure
-                </option>
-
-                <option value="account_issue">
-                    Account Access Issue
-                </option>
-
-                <option value="cancellation">
-                    Cancellation Request
-                </option>
-
-            </select>
-
-        </div>
-
-
-        <div>
-
-            <label>
-                Customer Frustration Level:
-                <span id="levelText">
-                    5/10
-                </span>
-            </label>
-
-            <input
-                type="range"
-                id="frustration"
-                min="1"
-                max="10"
-                value="5"
-            >
-
-            <div class="levelBox">
-
-                <div
-                    class="levelTitle"
-                    id="emotionText"
-                >
-                    😤 Frustrated
+            <div class="grid">
+                <div>
+                    <label>Customer Persona</label>
+                    <select id="persona">
+                        <option value="polite">Polite Customer</option>
+                        <option value="concerned">Concerned Customer</option>
+                        <option value="frustrated" selected>Frustrated Customer</option>
+                        <option value="angry">Angry Customer</option>
+                        <option value="furious">Furious Customer</option>
+                    </select>
                 </div>
 
-                <div
-                    class="levelDescription"
-                    id="levelDescription"
-                >
-                    The customer is noticeably
-                    dissatisfied and wants a concrete answer.
+                <div>
+                    <label>Customer Scenario</label>
+                    <select id="scenario">
+                        <option value="refund_request" selected>Refund Request</option>
+                        <option value="delayed_order">Delayed Order</option>
+                        <option value="payment_failure">Payment Failure</option>
+                        <option value="account_issue">Account Access Issue</option>
+                        <option value="cancellation">Cancellation Request</option>
+                    </select>
                 </div>
 
+                <div>
+                    <label>
+                        Customer Frustration Level:
+                        <span id="levelText">5/10</span>
+                    </label>
+                    <input type="range" id="frustration" min="1" max="10" value="5">
+
+                    <div class="levelBox">
+                        <div class="levelTitle" id="emotionText">😤 Frustrated</div>
+                        <div class="levelDescription" id="levelDescription">
+                            The customer is noticeably dissatisfied and wants a concrete answer.
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label>Expected Resolution</label>
+                    <select id="resolution">
+                        <option value="full_refund" selected>Full Refund</option>
+                        <option value="partial_refund">Partial Refund</option>
+                        <option value="replacement">Replacement</option>
+                        <option value="store_credit">Store Credit</option>
+                        <option value="cancellation_confirmed">Cancellation Confirmed</option>
+                        <option value="account_restored">Account Restored</option>
+                        <option value="new_delivery_date">New Delivery Date</option>
+                    </select>
+                </div>
             </div>
 
+            <button class="startBtn" onclick="startSimulation()">
+                🚀 Start Simulation
+            </button>
+
+            <div id="message" class="success"></div>
         </div>
 
+        <!-- ACTIVE SESSION -->
+        <div id="activeSection" class="hidden">
+            <div class="card">
+                <h2>📊 Active Customer Session</h2>
 
-        <div>
+                <div class="activeHeader">
+                    <div class="info">
+                        <small>Customer Persona</small>
+                        <strong id="activePersona">-</strong>
+                    </div>
+                    <div class="info">
+                        <small>Current Scenario</small>
+                        <strong id="activeScenario">-</strong>
+                    </div>
+                    <div class="info">
+                        <small>Customer Emotion</small>
+                        <strong id="activeEmotion">-</strong>
+                    </div>
+                    <div class="info">
+                        <small>Frustration Level</small>
+                        <strong id="activeLevel">-</strong>
+                    </div>
+                </div>
+            </div>
 
-            <label>
-                Expected Resolution
-            </label>
+            <div class="conversationLayout">
+                <!-- CONVERSATION -->
+                <div class="card">
+                    <h2>💬 Customer Conversation</h2>
 
-            <select id="resolution">
+                    <div id="chat" class="chat"></div>
 
-                <option
-                    value="full_refund"
-                    selected
-                >
-                    Full Refund
-                </option>
+                    <div class="replyBox">
+                        <label>Your Reply as Support Agent</label>
+                        <textarea id="agentReply" rows="4" placeholder="Type your support response here..."></textarea>
 
-                <option value="partial_refund">
-                    Partial Refund
-                </option>
+                        <label style="margin-top:15px;">
+                            Frustration Level for Next Customer Reply:
+                            <span id="replyLevel">5/10</span>
+                        </label>
+                        <input type="range" id="replyFrustration" min="1" max="10" value="5">
 
-                <option value="replacement">
-                    Replacement
-                </option>
+                        <button class="sendBtn" onclick="sendReply()">
+                            💬 Send Reply & Get Customer Response
+                        </button>
+                    </div>
+                </div>
 
-                <option value="store_credit">
-                    Store Credit
-                </option>
+                <!-- COPILOT -->
+                <div class="card">
+                    <h2>🤖 Agent Copilot</h2>
+                    <p style="color:#68778e;">Real-time coaching guidance</p>
 
-                <option value="cancellation_confirmed">
-                    Cancellation Confirmed
-                </option>
-
-                <option value="account_restored">
-                    Account Restored
-                </option>
-
-                <option value="new_delivery_date">
-                    New Delivery Date
-                </option>
-
-            </select>
-
+                    <div class="copilot">
+                        <div class="copilotBox">
+                            <h4>👤 Customer Persona</h4>
+                            <p id="copilotPersona">-</p>
+                        </div>
+                        <div class="copilotBox">
+                            <h4>🎯 Current Scenario</h4>
+                            <p id="copilotScenario">-</p>
+                        </div>
+                        <div class="copilotBox">
+                            <h4>❤️ Customer Emotion</h4>
+                            <p id="copilotEmotion">-</p>
+                        </div>
+                        <div class="copilotBox">
+                            <h4>🔥 Frustration Level</h4>
+                            <p id="copilotLevel">-</p>
+                        </div>
+                        <div class="copilotBox">
+                            <h4>💡 Coaching Tips</h4>
+                            <p id="tips">
+                                Acknowledge the customer's concern.<br><br>
+                                Give a concrete next step.<br><br>
+                                Match your response to the customer's emotional intensity.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-
     </div>
 
-
-    <button
-        class="startBtn"
-        onclick="startSimulation()"
-    >
-        🚀 Start Simulation
-    </button>
-
-    <div
-        id="message"
-        class="success"
-    ></div>
-
-</div>
-
-
-<!-- =====================================================
-     ACTIVE SESSION
-====================================================== -->
-
-<div
-    id="activeSection"
-    class="hidden"
->
-
-
-<div class="card">
-
-    <h2>
-        📊 Active Customer Session
-    </h2>
-
-
-    <div class="activeHeader">
-
-
-        <div class="info">
-
-            <small>
-                Customer Persona
-            </small>
-
-            <strong id="activePersona">
-                -
-            </strong>
-
+    <!-- ======================= MANUAL ANALYSIS ======================= -->
+    <div id="mode-manual" class="hidden">
+        <div class="title">
+            <h1>Manual Analysis</h1>
+            <p>Upload or paste a conversation transcript for detailed analysis.</p>
         </div>
 
+        <div class="card">
+            <h2>📋 Conversation Analysis</h2>
+            <p style="color:#68778e; margin-bottom: 15px;">
+                Paste a full conversation transcript below to get coaching insights, emotion analysis and improvement suggestions.
+            </p>
 
-        <div class="info">
+            <textarea id="manualTranscript" rows="12" placeholder="Paste conversation transcript here..."></textarea>
 
-            <small>
-                Current Scenario
-            </small>
+            <button class="startBtn" style="margin-top: 15px;" onclick="analyzeConversation()">
+                🔍 Analyze Conversation
+            </button>
 
-            <strong id="activeScenario">
-                -
-            </strong>
-
+            <!-- Results will appear here -->
+            <div id="analysisResults" class="hidden" style="margin-top: 25px;"></div>
         </div>
-
-
-        <div class="info">
-
-            <small>
-                Customer Emotion
-            </small>
-
-            <strong id="activeEmotion">
-                -
-            </strong>
-
-        </div>
-
-
-        <div class="info">
-
-            <small>
-                Frustration Level
-            </small>
-
-            <strong id="activeLevel">
-                -
-            </strong>
-
-        </div>
-
-
     </div>
 
-</div>
+    <!-- ======================= REPLAY LIBRARY ======================= -->
+    <div id="mode-replay" class="hidden">
+        <div class="title">
+            <h1>Replay Library</h1>
+            <p>Browse and replay previous simulation sessions.</p>
+        </div>
 
-
-<div class="conversationLayout">
-
-
-<!-- =====================================================
-     CONVERSATION
-====================================================== -->
-
-<div class="card">
-
-    <h2>
-        💬 Customer Conversation
-    </h2>
-
-
-    <div
-        id="chat"
-        class="chat"
-    ></div>
-
-
-    <div class="replyBox">
-
-        <label>
-            Your Reply as Support Agent
-        </label>
-
-        <textarea
-            id="agentReply"
-            rows="4"
-            placeholder="Type your support response here..."
-        ></textarea>
-
-
-        <label
-            style="margin-top:15px;"
-        >
-            Frustration Level for Next Customer Reply:
-            <span id="replyLevel">
-                5/10
-            </span>
-        </label>
-
-
-        <input
-            type="range"
-            id="replyFrustration"
-            min="1"
-            max="10"
-            value="5"
-        >
-
-
-        <button
-            class="sendBtn"
-            onclick="sendReply()"
-        >
-            💬 Send Reply & Get Customer Response
-        </button>
-
+        <div class="card">
+            <h2>📚 Saved Sessions</h2>
+            <p style="color:#68778e;">
+                Previous simulation sessions will appear here once you start saving them.
+            </p>
+            <div style="margin-top: 20px; padding: 30px; background: #f7f9fc; border-radius: 12px; text-align: center; color: #738099;">
+                No saved sessions yet
+            </div>
+        </div>
     </div>
-
-</div>
-
-
-<!-- =====================================================
-     COPILOT
-====================================================== -->
-
-<div class="card">
-
-    <h2>
-        🤖 Agent Copilot
-    </h2>
-
-    <p
-        style="color:#68778e;"
-    >
-        Real-time coaching guidance
-    </p>
-
-
-    <div class="copilot">
-
-
-        <div class="copilotBox">
-
-            <h4>
-                👤 Customer Persona
-            </h4>
-
-            <p id="copilotPersona">
-                -
-            </p>
-
-        </div>
-
-
-        <div class="copilotBox">
-
-            <h4>
-                🎯 Current Scenario
-            </h4>
-
-            <p id="copilotScenario">
-                -
-            </p>
-
-        </div>
-
-
-        <div class="copilotBox">
-
-            <h4>
-                ❤️ Customer Emotion
-            </h4>
-
-            <p id="copilotEmotion">
-                -
-            </p>
-
-        </div>
-
-
-        <div class="copilotBox">
-
-            <h4>
-                🔥 Frustration Level
-            </h4>
-
-            <p id="copilotLevel">
-                -
-            </p>
-
-        </div>
-
-
-        <div class="copilotBox">
-
-            <h4>
-                💡 Coaching Tips
-            </h4>
-
-            <p id="tips">
-                Acknowledge the customer's concern.
-                <br><br>
-                Give a concrete next step.
-                <br><br>
-                Match your response to the customer's emotional intensity.
-            </p>
-
-        </div>
-
-    </div>
-
-</div>
-
-
-</div>
-
-</div>
 
 </main>
-
 </div>
 
-
 <script>
-
-
 let sessionId = null;
 
-
-const frustration = document.getElementById(
-    "frustration"
-);
-
-
-const levelText = document.getElementById(
-    "levelText"
-);
-
-
-const emotionText = document.getElementById(
-    "emotionText"
-);
-
-
-const levelDescription =
-    document.getElementById(
-        "levelDescription"
-    );
-
-
-const replyFrustration =
-    document.getElementById(
-        "replyFrustration"
-    );
-
-
-const replyLevel =
-    document.getElementById(
-        "replyLevel"
-    );
-
+const frustration = document.getElementById("frustration");
+const levelText = document.getElementById("levelText");
+const emotionText = document.getElementById("emotionText");
+const levelDescription = document.getElementById("levelDescription");
+const replyFrustration = document.getElementById("replyFrustration");
+const replyLevel = document.getElementById("replyLevel");
 
 function emotion(level) {
-
-    if (level <= 2)
-        return "Calm";
-
-    if (level <= 4)
-        return "Concerned";
-
-    if (level <= 6)
-        return "Frustrated";
-
-    if (level <= 8)
-        return "Angry";
-
+    if (level <= 2) return "Calm";
+    if (level <= 4) return "Concerned";
+    if (level <= 6) return "Frustrated";
+    if (level <= 8) return "Angry";
     return "Furious";
 }
 
-
 function description(level) {
-
-    if (level <= 2)
-        return "The customer is calm and polite.";
-
-    if (level <= 4)
-        return "The customer is concerned and wants clarification.";
-
-    if (level <= 6)
-        return "The customer is frustrated and wants a concrete answer.";
-
-    if (level <= 8)
-        return "The customer is angry, direct and demanding.";
-
+    if (level <= 2) return "The customer is calm and polite.";
+    if (level <= 4) return "The customer is concerned and wants clarification.";
+    if (level <= 6) return "The customer is frustrated and wants a concrete answer.";
+    if (level <= 8) return "The customer is angry, direct and demanding.";
     return "The customer is extremely frustrated and wants immediate action.";
 }
 
-
 function updateLevelUI() {
-
-    const level =
-        Number(
-            frustration.value
-        );
-
-    levelText.textContent =
-        level + "/10";
-
-    emotionText.textContent =
-        "🔥 " + emotion(level);
-
-    levelDescription.textContent =
-        description(level);
+    const level = Number(frustration.value);
+    levelText.textContent = level + "/10";
+    emotionText.textContent = "🔥 " + emotion(level);
+    levelDescription.textContent = description(level);
 }
 
+frustration.addEventListener("input", updateLevelUI);
 
-frustration.addEventListener(
-    "input",
-    updateLevelUI
-);
-
-
-replyFrustration.addEventListener(
-    "input",
-    function() {
-
-        replyLevel.textContent =
-            replyFrustration.value + "/10";
-
-    }
-);
-
+replyFrustration.addEventListener("input", function () {
+    replyLevel.textContent = replyFrustration.value + "/10";
+});
 
 updateLevelUI();
 
+// ======================= MODE SWITCHING =======================
+function switchMode(mode) {
+    // Hide all modes
+    document.getElementById('mode-live').classList.add('hidden');
+    document.getElementById('mode-manual').classList.add('hidden');
+    document.getElementById('mode-replay').classList.add('hidden');
 
-async function startSimulation() {
+    // Remove active class
+    document.getElementById('nav-live').classList.remove('active');
+    document.getElementById('nav-manual').classList.remove('active');
+    document.getElementById('nav-replay').classList.remove('active');
 
-    const persona =
-        document.getElementById(
-            "persona"
-        ).value;
+    // Reset icons
+    document.getElementById('nav-live').textContent = '○ Live Simulator';
+    document.getElementById('nav-manual').textContent = '○ Manual Analysis';
+    document.getElementById('nav-replay').textContent = '○ Replay Library';
 
-    const scenario =
-        document.getElementById(
-            "scenario"
-        ).value;
-
-    const level =
-        Number(
-            frustration.value
-        );
-
-    const resolution =
-        document.getElementById(
-            "resolution"
-        ).value;
-
-
-    document.getElementById(
-        "message"
-    ).textContent =
-        "Starting simulation...";
-
-
-    try {
-
-        const response =
-            await fetch(
-                "/session/start",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            persona:
-                                persona,
-
-                            scenario:
-                                scenario,
-
-                            frustration_level:
-                                level,
-
-                            expected_resolution:
-                                resolution
-                        })
-                }
-            );
-
-
-        const data =
-            await response.json();
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                data.detail ||
-                "Failed to start simulation"
-            );
-
-        }
-
-
-        sessionId =
-            data.session_id;
-
-
-        document.getElementById(
-            "activeSection"
-        ).classList.remove(
-            "hidden"
-        );
-
-
-        document.getElementById(
-            "status"
-        ).textContent =
-            "● Session Active";
-
-
-        document.getElementById(
-            "activePersona"
-        ).textContent =
-            data.persona_name;
-
-
-        document.getElementById(
-            "activeScenario"
-        ).textContent =
-            data.scenario_name;
-
-
-        document.getElementById(
-            "activeEmotion"
-        ).textContent =
-            data.emotion.label;
-
-
-        document.getElementById(
-            "activeLevel"
-        ).textContent =
-            data.frustration_level +
-            "/10";
-
-
-        document.getElementById(
-            "copilotPersona"
-        ).textContent =
-            data.persona_name;
-
-
-        document.getElementById(
-            "copilotScenario"
-        ).textContent =
-            data.scenario_name;
-
-
-        updateCopilot(
-            data
-        );
-
-
-        document.getElementById(
-            "chat"
-        ).innerHTML = "";
-
-
-        addCustomerMessage(
-            data.customer_message,
-            data.emotion.label,
-            data.frustration_level
-        );
-
-
-        document.getElementById(
-            "message"
-        ).textContent =
-            "✅ Simulation started successfully!";
-
-
-        replyFrustration.value =
-            data.frustration_level;
-
-        replyLevel.textContent =
-            data.frustration_level +
-            "/10";
-
-    }
-
-    catch(error) {
-
-        alert(
-            "Failed to start simulation:\n\n" +
-            error.message
-        );
-
-        document.getElementById(
-            "message"
-        ).textContent = "";
-
+    // Show selected mode
+    if (mode === 'live') {
+        document.getElementById('mode-live').classList.remove('hidden');
+        document.getElementById('nav-live').classList.add('active');
+        document.getElementById('nav-live').textContent = '◉ Live Simulator';
+    } else if (mode === 'manual') {
+        document.getElementById('mode-manual').classList.remove('hidden');
+        document.getElementById('nav-manual').classList.add('active');
+        document.getElementById('nav-manual').textContent = '◉ Manual Analysis';
+    } else if (mode === 'replay') {
+        document.getElementById('mode-replay').classList.remove('hidden');
+        document.getElementById('nav-replay').classList.add('active');
+        document.getElementById('nav-replay').textContent = '◉ Replay Library';
     }
 }
 
+// ======================= SIMULATION FUNCTIONS =======================
+async function startSimulation() {
+    const persona = document.getElementById("persona").value;
+    const scenario = document.getElementById("scenario").value;
+    const level = Number(frustration.value);
+    const resolution = document.getElementById("resolution").value;
 
-async function sendReply() {
-
-    if (!sessionId) {
-
-        alert(
-            "Please start a simulation first."
-        );
-
-        return;
-    }
-
-
-    const input =
-        document.getElementById(
-            "agentReply"
-        );
-
-
-    const text =
-        input.value.trim();
-
-
-    if (!text) {
-
-        alert(
-            "Please enter your support reply."
-        );
-
-        return;
-    }
-
-
-    const selectedLevel =
-        Number(
-            replyFrustration.value
-        );
-
-
-    addAgentMessage(
-        text
-    );
-
-
-    input.value = "";
-
+    document.getElementById("message").textContent = "Starting simulation...";
 
     try {
+        const response = await fetch("/session/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                persona: persona,
+                scenario: scenario,
+                frustration_level: level,
+                expected_resolution: resolution
+            })
+        });
 
-        const response =
-            await fetch(
-                "/session/respond",
-                {
-
-                    method:
-                        "POST",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-
-                    body:
-                        JSON.stringify({
-
-                            session_id:
-                                sessionId,
-
-                            message:
-                                text,
-
-                            frustration_level:
-                                selectedLevel
-                        })
-                }
-            );
-
-
-        const data =
-            await response.json();
-
+        const data = await response.json();
 
         if (!response.ok) {
-
-            throw new Error(
-                data.detail ||
-                "Failed to get customer response"
-            );
-
+            throw new Error(data.detail || "Failed to start simulation");
         }
 
+        sessionId = data.session_id;
 
-        /*
-         IMPORTANT:
-         The returned frustration level is the
-         customer's ACTUAL current frustration.
-        */
+        document.getElementById("activeSection").classList.remove("hidden");
+        document.getElementById("status").textContent = "● Session Active";
 
-        frustration.value =
-            data.frustration_level;
+        document.getElementById("activePersona").textContent = data.persona_name;
+        document.getElementById("activeScenario").textContent = data.scenario_name;
+        document.getElementById("activeEmotion").textContent = data.emotion.label;
+        document.getElementById("activeLevel").textContent = data.frustration_level + "/10";
 
-        levelText.textContent =
-            data.frustration_level +
-            "/10";
+        document.getElementById("copilotPersona").textContent = data.persona_name;
+        document.getElementById("copilotScenario").textContent = data.scenario_name;
 
+        updateCopilot(data);
 
-        replyFrustration.value =
-            data.frustration_level;
+        document.getElementById("chat").innerHTML = "";
+        addCustomerMessage(data.customer_message, data.emotion.label, data.frustration_level);
 
-        replyLevel.textContent =
-            data.frustration_level +
-            "/10";
+        document.getElementById("message").textContent = "✅ Simulation started successfully!";
 
+        replyFrustration.value = data.frustration_level;
+        replyLevel.textContent = data.frustration_level + "/10";
+
+    } catch (error) {
+        alert("Failed to start simulation:\n\n" + error.message);
+        document.getElementById("message").textContent = "";
+    }
+}
+
+async function sendReply() {
+    if (!sessionId) {
+        alert("Please start a simulation first.");
+        return;
+    }
+
+    const input = document.getElementById("agentReply");
+    const text = input.value.trim();
+
+    if (!text) {
+        alert("Please enter your support reply.");
+        return;
+    }
+
+    const selectedLevel = Number(replyFrustration.value);
+
+    addAgentMessage(text);
+    input.value = "";
+
+    try {
+        const response = await fetch("/session/respond", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                session_id: sessionId,
+                message: text,
+                frustration_level: selectedLevel
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Failed to get customer response");
+        }
+
+        frustration.value = data.frustration_level;
+        levelText.textContent = data.frustration_level + "/10";
+        replyFrustration.value = data.frustration_level;
+        replyLevel.textContent = data.frustration_level + "/10";
 
         updateLevelUI();
 
+        document.getElementById("activeEmotion").textContent = data.emotion.label;
+        document.getElementById("activeLevel").textContent = data.frustration_level + "/10";
 
-        document.getElementById(
-            "activeEmotion"
-        ).textContent =
-            data.emotion.label;
-
-
-        document.getElementById(
-            "activeLevel"
-        ).textContent =
-            data.frustration_level +
-            "/10";
-
-
-        addCustomerMessage(
-            data.customer_message,
-            data.emotion.label,
-            data.frustration_level
-        );
-
-
-        updateCopilot(
-            data
-        );
-
+        addCustomerMessage(data.customer_message, data.emotion.label, data.frustration_level);
+        updateCopilot(data);
 
         if (data.finished) {
-
-            document.getElementById(
-                "status"
-            ).textContent =
-                "● Session Completed";
-
+            document.getElementById("status").textContent = "● Session Completed";
         }
 
-    }
-
-    catch(error) {
-
-        alert(
-            "Failed to get customer response:\n\n" +
-            error.message
-        );
-
+    } catch (error) {
+        alert("Failed to get customer response:\n\n" + error.message);
     }
 }
 
-
-function addCustomerMessage(
-    text,
-    emotion,
-    level
-) {
-
-    const chat =
-        document.getElementById(
-            "chat"
-        );
-
-
-    const div =
-        document.createElement(
-            "div"
-        );
-
-
-    div.className =
-        "message customer";
-
+function addCustomerMessage(text, emotion, level) {
+    const chat = document.getElementById("chat");
+    const div = document.createElement("div");
+    div.className = "message customer";
 
     div.innerHTML = `
-
         <div class="messageHeader">
-
             👤 Customer
-
-            <span class="badge">
-                ${emotion} · ${level}/10
-            </span>
-
+            <span class="badge">${emotion} · ${level}/10</span>
         </div>
-
-        <div>
-            ${escapeHtml(text)}
-        </div>
+        <div>${escapeHtml(text)}</div>
     `;
 
-
-    chat.appendChild(
-        div
-    );
-
-
-    chat.scrollTop =
-        chat.scrollHeight;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
 }
-
 
 function addAgentMessage(text) {
-
-    const chat =
-        document.getElementById(
-            "chat"
-        );
-
-
-    const div =
-        document.createElement(
-            "div"
-        );
-
-
-    div.className =
-        "message agent";
-
+    const chat = document.getElementById("chat");
+    const div = document.createElement("div");
+    div.className = "message agent";
 
     div.innerHTML = `
-
-        <div class="messageHeader">
-            🎧 Support Agent
-        </div>
-
-        <div>
-            ${escapeHtml(text)}
-        </div>
+        <div class="messageHeader">🎧 Support Agent</div>
+        <div>${escapeHtml(text)}</div>
     `;
 
-
-    chat.appendChild(
-        div
-    );
-
-
-    chat.scrollTop =
-        chat.scrollHeight;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
 }
 
-
 function updateCopilot(data) {
-
-    document.getElementById(
-        "copilotPersona"
-    ).textContent =
-        data.persona_name;
-
-
-    document.getElementById(
-        "copilotScenario"
-    ).textContent =
-        data.scenario_name;
-
-
-    document.getElementById(
-        "copilotEmotion"
-    ).textContent =
-        data.emotion.label;
-
-
-    document.getElementById(
-        "copilotLevel"
-    ).textContent =
-        data.frustration_level +
-        "/10";
-
+    document.getElementById("copilotPersona").textContent = data.persona_name;
+    document.getElementById("copilotScenario").textContent = data.scenario_name;
+    document.getElementById("copilotEmotion").textContent = data.emotion.label;
+    document.getElementById("copilotLevel").textContent = data.frustration_level + "/10";
 
     let tips = [];
 
-
-    if (
-        data.frustration_level >= 7
-    ) {
-
-        tips.push(
-            "Acknowledge the customer's frustration first."
-        );
-
-        tips.push(
-            "Use a clear and direct response."
-        );
-
-    }
-    else {
-
-        tips.push(
-            "Maintain a respectful tone."
-        );
-
-        tips.push(
-            "Give a clear next step."
-        );
-
+    if (data.frustration_level >= 7) {
+        tips.push("Acknowledge the customer's frustration first.");
+        tips.push("Use a clear and direct response.");
+    } else {
+        tips.push("Maintain a respectful tone.");
+        tips.push("Give a clear next step.");
     }
 
+    tips.push("Match your response to the customer's current emotional intensity.");
 
-    tips.push(
-        "Match your response to the customer's current emotional intensity."
-    );
-
-
-    document.getElementById(
-        "tips"
-    ).innerHTML =
-        tips.join(
-            "<br><br>"
-        );
+    document.getElementById("tips").innerHTML = tips.join("<br><br>");
 }
 
-
 function escapeHtml(text) {
-
-    const div =
-        document.createElement(
-            "div"
-        );
-
-    div.textContent =
-        text;
-
+    const div = document.createElement("div");
+    div.textContent = text;
     return div.innerHTML;
 }
 
+// ======================= MANUAL ANALYSIS =======================
+async function analyzeConversation() {
+    const transcript = document.getElementById("manualTranscript").value.trim();
+    const resultsDiv = document.getElementById("analysisResults");
 
+    if (!transcript) {
+        alert("Please paste a conversation transcript first.");
+        return;
+    }
+
+    // Show loading state
+    resultsDiv.classList.remove("hidden");
+    resultsDiv.innerHTML = `
+        <div style="text-align:center; padding: 30px; color:#68778e;">
+            ⏳ Analyzing conversation... Please wait.
+        </div>
+    `;
+
+    try {
+        const response = await fetch("/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ transcript: transcript })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Analysis failed");
+        }
+
+        // Display results
+        resultsDiv.innerHTML = `
+            <div style="background:#f7f9fc; border:1px solid #e0e7f0; border-radius:12px; padding:20px;">
+                <h3 style="margin-top:0;">📊 Analysis Results</h3>
+
+                <div class="copilotBox">
+                    <h4>❤️ Overall Customer Emotion</h4>
+                    <p><strong>${escapeHtml(data.emotion || "Unknown")}</strong> (Frustration: ${data.frustration_level || "N/A"}/10)</p>
+                </div>
+
+                <div class="copilotBox">
+                    <h4>✅ What the Agent Did Well</h4>
+                    <p>${escapeHtml(data.strengths || "No specific strengths identified.")}</p>
+                </div>
+
+                <div class="copilotBox">
+                    <h4>⚠️ Areas for Improvement</h4>
+                    <p>${escapeHtml(data.weaknesses || "No specific weaknesses identified.")}</p>
+                </div>
+
+                <div class="copilotBox">
+                    <h4>💡 Coaching Suggestions</h4>
+                    <p>${escapeHtml(data.suggestions || "No suggestions available.")}</p>
+                </div>
+
+                ${data.improved_response ? `
+                <div class="copilotBox">
+                    <h4>✨ Suggested Better Response</h4>
+                    <p style="background:#e8fff1; padding:12px; border-radius:8px;">${escapeHtml(data.improved_response)}</p>
+                </div>
+                ` : ""}
+            </div>
+        `;
+
+    } catch (error) {
+        resultsDiv.innerHTML = `
+            <div style="color:#c53030; padding: 20px; background:#fff5f5; border-radius:10px;">
+                ❌ Analysis failed: ${escapeHtml(error.message)}
+            </div>
+        `;
+    }
+}
 </script>
 
 </body>
-
 </html>

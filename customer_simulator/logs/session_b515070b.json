@@ -1,0 +1,26 @@
+{
+  "session_id": "b515070b",
+  "persona": "frustrated",
+  "scenario": "refund_request",
+  "frustration_level": 6,
+  "history": [
+    {
+      "role": "customer",
+      "content": "This refund delay is unacceptable. I need a definite answer and timeline now.",
+      "frustration_level": 7,
+      "emotion": "Angry"
+    },
+    {
+      "role": "agent",
+      "content": "ok I'm sorry i will check the status and we will refund by 24 hrs",
+      "frustration_level": null,
+      "emotion": null
+    },
+    {
+      "role": "customer",
+      "content": "I'm still waiting for my refund and I need a concrete answer. When will this be completed?",
+      "frustration_level": 6,
+      "emotion": "Frustrated"
+    }
+  ]
+}

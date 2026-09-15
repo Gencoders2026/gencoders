@@ -1,0 +1,14 @@
+{
+  "session_id": "44a099b5",
+  "persona": "angry",
+  "scenario": "payment_failure",
+  "frustration_level": 4,
+  "history": [
+    {
+      "role": "customer",
+      "content": "I'm not happy about this. I'm concerned because my payment keeps failing. Could you please check what is wrong?",
+      "frustration_level": 4,
+      "emotion": "Concerned"
+    }
+  ]
+}
