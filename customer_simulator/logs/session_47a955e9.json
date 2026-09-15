@@ -1,0 +1,27 @@
+{
+    "session_id": "47a955e9",
+    "persona": "frustrated",
+    "scenario": "refund_request",
+    "frustration_level": 5,
+    "emotion": "Frustrated",
+    "history": [
+        {
+            "role": "customer",
+            "content": "I'm getting frustrated because I still haven't received my refund. Can you please check the status?",
+            "frustration_level": 5,
+            "emotion": "Frustrated"
+        },
+        {
+            "role": "agent",
+            "content": "I'm sorry .yaa i will imediately check the status and inform you soon",
+            "frustration_level": 5,
+            "emotion": "Frustrated"
+        },
+        {
+            "role": "customer",
+            "content": "Thanks for checking, but I still need a clear answer about when my refund will be completed.",
+            "frustration_level": 5,
+            "emotion": "Frustrated"
+        }
+    ]
+}

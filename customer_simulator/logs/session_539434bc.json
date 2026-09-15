@@ -1,0 +1,18 @@
+{
+    "session_id": "539434bc",
+    "persona": "frustrated",
+    "scenario": "refund_request",
+    "frustration_level": 5,
+    "emotion": "frustrated",
+    "expected_resolution": "full_refund",
+    "finished": false,
+    "history": [
+        {
+            "role": "customer",
+            "content": "Hello, I am contacting you because I am still waiting for my refund. Could you please check the status? I am getting frustrated because this has not been resolved yet.",
+            "emotion": "frustrated",
+            "frustration_level": 5,
+            "timestamp": "2026-09-15T20:16:59.392916"
+        }
+    ]
+}

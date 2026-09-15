@@ -1,0 +1,47 @@
+{
+    "session_id": "2cf3c8f5",
+    "persona": "frustrated",
+    "scenario": "delayed_order",
+    "frustration_level": 5,
+    "emotion": {
+        "label": "Frustrated",
+        "intensity": 5
+    },
+    "history": [
+        {
+            "role": "customer",
+            "content": "I'm getting frustrated with this delay. I need a clear update about when my order will arrive.",
+            "timestamp": "2026-09-15T20:38:51.791926",
+            "frustration_level": 5,
+            "emotion": "Frustrated"
+        },
+        {
+            "role": "agent",
+            "content": "I'm sorry for that...i will check the ststus and i will update you very soon with confirmation email",
+            "timestamp": "2026-09-15T20:39:57.050003",
+            "frustration_level": 5,
+            "emotion": "Frustrated"
+        },
+        {
+            "role": "customer",
+            "content": "My order is still delayed and I'm getting really frustrated. Can you please give me a definite delivery update?",
+            "timestamp": "2026-09-15T20:39:57.052548",
+            "frustration_level": 5,
+            "emotion": "Frustrated"
+        },
+        {
+            "role": "agent",
+            "content": "I completely understand your frustration. Let me look directly into your order status right now to give you a definitive delivery update-- one moment while i check this for you",
+            "timestamp": "2026-09-15T20:41:43.993979",
+            "frustration_level": 5,
+            "emotion": "Frustrated"
+        },
+        {
+            "role": "customer",
+            "content": "This delay is becoming frustrating. Please check the order and tell me what I should expect.",
+            "timestamp": "2026-09-15T20:41:43.995669",
+            "frustration_level": 5,
+            "emotion": "Frustrated"
+        }
+    ]
+}

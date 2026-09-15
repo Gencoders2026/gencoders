@@ -1,96 +1,81 @@
 """
-FastAPI interface for the Customer Simulator Agent.
-
-Frustration Level is the single control for customer emotional intensity.
-Patience Level and Issue Severity are not used.
+FastAPI server for Customer Simulator.
 """
 
 import os
-from typing import Optional, Dict
+import json
 from pathlib import Path
+from typing import Optional, Dict
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from simulator import CustomerSimulator, create_simulator
-from personas import list_personas
-from scenarios import list_scenarios
-from config import API_HOST, API_PORT, LOG_DIR
-
-
-# ============================================================
-# PATHS
-# ============================================================
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-FRONTEND_DIR = os.path.join(
-    BASE_DIR,
-    "frontend"
-)
-
-INDEX_PATH = os.path.join(
-    FRONTEND_DIR,
-    "index.html"
+from simulator import (
+    CustomerSimulator,
+    create_simulator,
+    PERSONAS,
+    SCENARIOS
 )
 
 
-# ============================================================
-# FASTAPI APP
-# ============================================================
+BASE_DIR = Path(
+    os.path.dirname(
+        os.path.abspath(__file__)
+    )
+)
+
+FRONTEND_DIR = BASE_DIR / "frontend"
+
+INDEX_PATH = FRONTEND_DIR / "index.html"
+
+LOG_DIR = BASE_DIR / "logs"
+
+LOG_DIR.mkdir(
+    exist_ok=True
+)
+
 
 app = FastAPI(
-    title="Customer Simulator Agent API",
-    description=(
-        "Simulate realistic customer conversations "
-        "for support training and testing."
-    ),
-    version="1.0.0",
+    title="Customer Simulator Agent",
+    version="2.0"
 )
 
 
-# ============================================================
+# ==========================================================
 # CORS
-# ============================================================
+# ==========================================================
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 
-# ============================================================
+# ==========================================================
 # ACTIVE SESSIONS
-# ============================================================
+# ==========================================================
 
-SESSIONS: Dict[str, CustomerSimulator] = {}
+SESSIONS: Dict[
+    str,
+    CustomerSimulator
+] = {}
 
 
-# ============================================================
+# ==========================================================
 # REQUEST MODELS
-# ============================================================
+# ==========================================================
 
 class SessionRequest(BaseModel):
-    """
-    Request used to start a customer simulation.
 
-    Frustration level is the customer's initial
-    emotional intensity from 1 to 10.
-    """
+    persona: str = "frustrated"
 
-    persona: str = Field(
-        default="frustrated"
-    )
-
-    scenario: str = Field(
-        default="refund_request"
-    )
+    scenario: str = "refund_request"
 
     frustration_level: int = Field(
         default=5,
@@ -98,19 +83,10 @@ class SessionRequest(BaseModel):
         le=10
     )
 
-    expected_resolution: str = Field(
-        default="full_refund"
-    )
-
-    use_llm: bool = Field(
-        default=True
-    )
+    expected_resolution: str = "full_refund"
 
 
 class AgentMessageRequest(BaseModel):
-    """
-    Support agent's reply to the customer.
-    """
 
     session_id: str
 
@@ -119,11 +95,25 @@ class AgentMessageRequest(BaseModel):
         min_length=1
     )
 
+    # Optional manual override.
+    # This is the ACTUAL frustration level.
+    frustration_level: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=10
+    )
 
-class ManualAnalyzeRequest(BaseModel):
-    """
-    Request for manual customer-message analysis.
-    """
+
+class FrustrationRequest(BaseModel):
+
+    frustration_level: int = Field(
+        ...,
+        ge=1,
+        le=10
+    )
+
+
+class AnalyzeRequest(BaseModel):
 
     query: str = Field(
         ...,
@@ -135,50 +125,41 @@ class ManualAnalyzeRequest(BaseModel):
     scenario_hint: Optional[str] = None
 
 
-# ============================================================
+# ==========================================================
 # FRONTEND
-# ============================================================
+# ==========================================================
 
-@app.get(
-    "/",
-    response_class=HTMLResponse
-)
-@app.get(
-    "/ui",
-    response_class=HTMLResponse
-)
-@app.get(
-    "/ui/",
-    response_class=HTMLResponse
-)
-async def serve_ui():
+@app.get("/")
+@app.get("/ui")
+@app.get("/ui/")
+async def home():
 
-    if os.path.exists(INDEX_PATH):
+    if INDEX_PATH.exists():
 
         return FileResponse(
             INDEX_PATH
         )
 
     return HTMLResponse(
-        "<h1>Error: frontend/index.html not found</h1>",
+        "<h1>frontend/index.html not found</h1>",
         status_code=404
     )
 
 
-if os.path.exists(FRONTEND_DIR):
+if FRONTEND_DIR.exists():
 
     app.mount(
         "/static",
         StaticFiles(
-            directory=FRONTEND_DIR
+            directory=str(FRONTEND_DIR)
         ),
         name="static"
     )
 
 
-# ============================================================
-# HEALTH CHECK
-# ============================================================
+# ==========================================================
+# HEALTH
+# ==========================================================
 
 @app.get("/health")
 def health():
@@ -189,20 +170,35 @@ def health():
     }
 
 
-# ============================================================
-# CONFIGURATION OPTIONS
-# ============================================================
+# ==========================================================
+# OPTIONS
+# ==========================================================
 
 @app.get("/config/options")
-def get_options():
+def options():
 
     return {
-        "personas": list_personas(),
 
-        "scenarios": list_scenarios(),
+        "personas": [
+            {
+                "value": key,
+                "name": value["name"],
+                "style": value["style"]
+            }
+            for key, value in PERSONAS.items()
+        ],
 
-        # Frustration is now the emotional control.
-        "frustration_levels": list(range(1, 11)),
+        "scenarios": [
+            {
+                "value": key,
+                "name": value["name"]
+            }
+            for key, value in SCENARIOS.items()
+        ],
+
+        "frustration_levels": list(
+            range(1, 11)
+        ),
 
         "resolutions": [
             "full_refund",
@@ -216,18 +212,16 @@ def get_options():
     }
 
 
-# ============================================================
+# ==========================================================
 # START SESSION
-# ============================================================
+# ==========================================================
 
 @app.post("/session/start")
-def start_session(req: SessionRequest):
+def start_session(
+    req: SessionRequest
+):
 
     try:
-
-        # ----------------------------------------------------
-        # Create simulator
-        # ----------------------------------------------------
 
         sim = create_simulator(
 
@@ -235,71 +229,37 @@ def start_session(req: SessionRequest):
 
             scenario=req.scenario,
 
-            # IMPORTANT:
-            # Frustration level controls the customer's
-            # initial emotional intensity.
-            frustration_level=req.frustration_level,
+            frustration_level=
+                req.frustration_level,
 
-            expected_resolution=req.expected_resolution,
-
-            use_llm=req.use_llm
+            expected_resolution=
+                req.expected_resolution
         )
-
-        # ----------------------------------------------------
-        # Start customer conversation
-        # ----------------------------------------------------
 
         result = sim.start()
 
-        # ----------------------------------------------------
-        # Store active session
-        # ----------------------------------------------------
-
-        SESSIONS[sim.session_id] = sim
+        SESSIONS[
+            sim.session_id
+        ] = sim
 
         return result
-
-    except KeyError as e:
-
-        raise HTTPException(
-            status_code=400,
-            detail=str(e)
-        )
-
-    except TypeError as e:
-
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                "Simulator configuration mismatch. "
-                "Make sure simulator.py uses "
-                "'frustration_level'. "
-                f"Details: {e}"
-            )
-        )
 
     except Exception as e:
 
         raise HTTPException(
             status_code=500,
-            detail=(
-                f"Failed to start session: {e}"
-            )
+            detail=f"Failed to start session: {e}"
         )
 
 
-# ============================================================
+# ==========================================================
 # CUSTOMER RESPONSE
-# ============================================================
+# ==========================================================
 
 @app.post("/session/respond")
 def respond_to_customer(
     req: AgentMessageRequest
 ):
-
-    # --------------------------------------------------------
-    # Find session
-    # --------------------------------------------------------
 
     sim = SESSIONS.get(
         req.session_id
@@ -309,17 +269,22 @@ def respond_to_customer(
 
         raise HTTPException(
             status_code=404,
-            detail=(
-                f"Session '{req.session_id}' "
-                "not found"
-            )
+            detail="Session not found"
         )
 
     try:
 
-        # ----------------------------------------------------
-        # Generate next customer response
-        # ----------------------------------------------------
+        # --------------------------------------------------
+        # IMPORTANT:
+        # If UI sends a frustration level,
+        # use that exact level.
+        # --------------------------------------------------
+
+        if req.frustration_level is not None:
+
+            sim.set_frustration_level(
+                req.frustration_level
+            )
 
         result = sim.respond(
             req.message
@@ -331,17 +296,59 @@ def respond_to_customer(
 
         raise HTTPException(
             status_code=500,
-            detail=(
-                f"Respond failed: {e}"
-            )
+            detail=f"Respond failed: {e}"
         )
 
 
-# ============================================================
-# GET SESSION STATE
-# ============================================================
+# ==========================================================
+# UPDATE FRUSTRATION
+# ==========================================================
 
-@app.get("/session/{session_id}")
+@app.patch(
+    "/session/{session_id}/frustration"
+)
+def update_frustration(
+    session_id: str,
+    req: FrustrationRequest
+):
+
+    sim = SESSIONS.get(
+        session_id
+    )
+
+    if not sim:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Session not found"
+        )
+
+    level = sim.set_frustration_level(
+        req.frustration_level
+    )
+
+    return {
+
+        "session_id":
+            session_id,
+
+        "frustration_level":
+            level,
+
+        "emotion":
+            sim._build_response(
+                ""
+            )["emotion"]
+    }
+
+
+# ==========================================================
+# SESSION STATE
+# ==========================================================
+
+@app.get(
+    "/session/{session_id}"
+)
 def get_session(
     session_id: str
 ):
@@ -360,12 +367,14 @@ def get_session(
     return sim.get_state()
 
 
-# ============================================================
-# GET SESSION LOG
-# ============================================================
+# ==========================================================
+# SESSION LOG
+# ==========================================================
 
-@app.get("/session/{session_id}/log")
-def get_session_log(
+@app.get(
+    "/session/{session_id}/log"
+)
+def get_log(
     session_id: str
 ):
 
@@ -373,45 +382,42 @@ def get_session_log(
         session_id
     )
 
-    # --------------------------------------------------------
-    # Active session
-    # --------------------------------------------------------
-
     if sim:
 
-        return sim.logger.get_full_log()
+        path = Path(
+            sim.log_path
+        )
 
-    # --------------------------------------------------------
-    # Try saved log
-    # --------------------------------------------------------
+    else:
 
-    log_path = (
-        Path(LOG_DIR)
-        / f"session_{session_id}.json"
-    )
+        path = (
+            LOG_DIR /
+            f"session_{session_id}.json"
+        )
 
-    if log_path.exists():
+    if not path.exists():
 
-        import json
+        raise HTTPException(
+            status_code=404,
+            detail="Log not found"
+        )
 
-        with open(
-            log_path,
-            encoding="utf-8"
-        ) as f:
+    with open(
+        path,
+        "r",
+        encoding="utf-8"
+    ) as file:
 
-            return json.load(f)
-
-    raise HTTPException(
-        status_code=404,
-        detail="Session not found"
-    )
+        return json.load(file)
 
 
-# ============================================================
+# ==========================================================
 # END SESSION
-# ============================================================
+# ==========================================================
 
-@app.delete("/session/{session_id}")
+@app.delete(
+    "/session/{session_id}"
+)
 def end_session(
     session_id: str
 ):
@@ -423,20 +429,11 @@ def end_session(
 
     if sim:
 
-        sim.logger.finalize(
-            sim.emotion_mgr
-            .get_state()
-            .to_dict()
-        )
-
         return {
             "status": "ended",
-
             "session_id": session_id,
-
-            "log_path": (
-                sim.logger.get_log_path()
-            )
+            "log_path":
+                str(sim.log_path)
         }
 
     return {
@@ -445,40 +442,37 @@ def end_session(
     }
 
 
-# ============================================================
-# LIST ACTIVE SESSIONS
-# ============================================================
+# ==========================================================
+# ACTIVE SESSIONS
+# ==========================================================
 
 @app.get("/sessions")
-def list_sessions():
+def sessions():
 
     return {
-        "active": list(
-            SESSIONS.keys()
-        ),
 
-        "count": len(
-            SESSIONS
-        )
+        "active":
+            list(SESSIONS.keys()),
+
+        "count":
+            len(SESSIONS)
     }
 
 
-# ============================================================
-# MANUAL CUSTOMER MESSAGE ANALYSIS
-# ============================================================
+# ==========================================================
+# MANUAL ANALYSIS
+# ==========================================================
 
 @app.post("/analyze")
-def analyze_customer_message(
-    req: ManualAnalyzeRequest
+def analyze(
+    req: AnalyzeRequest
 ):
 
     text = req.query.lower()
 
-    # ========================================================
-    # INTENT DETECTION
-    # ========================================================
-
-    intent = "general_inquiry"
+    # ------------------------------------------------------
+    # INTENT
+    # ------------------------------------------------------
 
     if any(
         word in text
@@ -495,9 +489,10 @@ def analyze_customer_message(
         word in text
         for word in [
             "late",
+            "delay",
             "delayed",
-            "not arrived",
-            "tracking"
+            "tracking",
+            "not arrived"
         ]
     ):
 
@@ -538,169 +533,128 @@ def analyze_customer_message(
 
         intent = "cancellation"
 
-    # ========================================================
-    # FRUSTRATION DETECTION
-    # ========================================================
+    else:
 
-    frustration_score = 5
+        intent = "general_inquiry"
 
-    # Very high frustration
+
+    # ------------------------------------------------------
+    # FRUSTRATION ANALYSIS
+    # ------------------------------------------------------
+
     if any(
         word in text
         for word in [
             "furious",
-            "ridiculous",
             "unacceptable",
-            "immediately",
-            "now!",
+            "ridiculous",
             "manager",
             "worst",
-            "terrible"
+            "immediately"
         ]
     ):
 
-        frustration_score = 9
+        score = 9
 
-    # High frustration
     elif any(
         word in text
         for word in [
             "angry",
             "frustrated",
             "upset",
-            "not happy",
             "annoyed"
         ]
     ):
 
-        frustration_score = 7
+        score = 7
 
-    # Low frustration / polite
     elif any(
         word in text
         for word in [
             "please",
             "thank",
-            "appreciate",
-            "kindly"
+            "appreciate"
         ]
     ):
 
-        frustration_score = 3
-
-    # ========================================================
-    # FRUSTRATION LABEL
-    # ========================================================
-
-    if frustration_score <= 2:
-
-        frustration_label = "calm"
-
-    elif frustration_score <= 4:
-
-        frustration_label = "concerned"
-
-    elif frustration_score <= 6:
-
-        frustration_label = "frustrated"
-
-    elif frustration_score <= 8:
-
-        frustration_label = "angry"
+        score = 3
 
     else:
 
-        frustration_label = "furious"
+        score = 5
 
-    # ========================================================
-    # ESCALATION RISK
-    # ========================================================
 
-    escalation_risk = "low"
+    if score <= 2:
+        label = "Calm"
+    elif score <= 4:
+        label = "Concerned"
+    elif score <= 6:
+        label = "Frustrated"
+    elif score <= 8:
+        label = "Angry"
+    else:
+        label = "Furious"
 
-    if frustration_score >= 8:
 
-        escalation_risk = "high"
+    if score >= 8:
+        risk = "High"
+    elif score >= 6:
+        risk = "Medium"
+    else:
+        risk = "Low"
 
-    elif frustration_score >= 6:
 
-        escalation_risk = "medium"
+    coaching = [
+        "Acknowledge the customer's concern.",
+        "Give a clear and concrete next step."
+    ]
 
-    # ========================================================
-    # COACHING
-    # ========================================================
+    if score >= 7:
 
-    coaching = []
-
-    if frustration_score >= 7:
-
-        coaching.append(
-            "Acknowledge the customer's frustration first."
+        coaching.insert(
+            0,
+            "Acknowledge the customer's frustration before giving the solution."
         )
 
-        coaching.append(
-            "Offer a concrete next step and timeline."
-        )
-
-    if intent == "refund_request":
-
-        coaching.append(
-            "Confirm order details and explain "
-            "the refund process clearly."
-        )
-
-    if escalation_risk == "high":
-
-        coaching.append(
-            "Consider offering escalation "
-            "to a supervisor early."
-        )
-
-    # ========================================================
-    # RETURN ANALYSIS
-    # ========================================================
 
     return {
 
-        "query": req.query,
+        "query":
+            req.query,
 
-        "intent": intent,
+        "intent":
+            intent,
 
-        # New terminology
-        "frustration_score": frustration_score,
+        "frustration_score":
+            score,
 
-        "frustration_level": frustration_score,
+        "frustration_level":
+            score,
 
-        "frustration_label": frustration_label,
+        "emotion_label":
+            label,
 
-        # Compatibility with existing frontend/code
-        "emotion_score": frustration_score,
+        "escalation_risk":
+            risk,
 
-        "emotion_label": frustration_label,
+        "coaching_guidance":
+            coaching,
 
-        "escalation_risk": escalation_risk,
-
-        "coaching_guidance": coaching,
-
-        "suggested_persona": (
-            req.persona_hint
-            or (
+        "suggested_persona":
+            req.persona_hint or (
                 "angry"
-                if frustration_score >= 7
+                if score >= 7
                 else "frustrated"
-            )
-        ),
+            ),
 
-        "suggested_scenario": (
-            req.scenario_hint
-            or intent
-        )
+        "suggested_scenario":
+            req.scenario_hint or intent
     }
 
 
-# ============================================================
-# RUN SERVER
-# ============================================================
+# ==========================================================
+# RUN
+# ==========================================================
 
 if __name__ == "__main__":
 
@@ -708,7 +662,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "api:app",
-        host=API_HOST,
-        port=API_PORT,
+        host="127.0.0.1",
+        port=8000,
         reload=True
     )
