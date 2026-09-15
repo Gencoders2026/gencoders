@@ -71,3 +71,7 @@ export async function getSessions() {
   const response = await api.get("/sessions");
   return response.data;
 }
+export async function getSessionLog(sessionId) {
+  const response = await api.get(`/session/${sessionId}/log`);
+  return response.data;
+}
