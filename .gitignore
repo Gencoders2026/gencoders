@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 .env
 vector_db/customer_simulator/logs/
+customer_simulator/logs/*.json 
