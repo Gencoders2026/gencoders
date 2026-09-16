@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import {
   getSession,
+  getSessionLog,
   sendMessage,
   endSession,
 } from "../services/sessionService";
@@ -23,12 +24,25 @@ function SupportConsole() {
   const [analysis, setAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
 
+  // ==========================================================
+  // LOAD SESSION
+  // ==========================================================
   useEffect(() => {
     async function loadSession() {
       try {
         const data = await getSession(sessionId);
 
         setSession(data);
+
+        // If the backend says the session is already finished,
+        // open the result page instead of keeping the user
+        // inside the active support console.
+        if (data.finished) {
+          navigate(`/session/${sessionId}/result`, {
+            replace: true,
+          });
+          return;
+        }
 
         // Analyze the latest customer message when the session loads
         const history = data.history || [];
@@ -58,16 +72,91 @@ function SupportConsole() {
           }
         }
       } catch (err) {
-        console.error("Failed to load session:", err);
-        setError("Unable to load this session.");
+        console.error("Failed to load active session:", err);
+
+        // ------------------------------------------------------
+        // The active session may already be completed and removed
+        // from the backend's in-memory SESSIONS dictionary.
+        //
+        // In that case, load the saved log instead.
+        // ------------------------------------------------------
+        try {
+          const logData = await getSessionLog(sessionId);
+
+          const history =
+            logData.history ||
+            (logData.conversation || []).map((item) => ({
+              role: item.role,
+              content: item.message || item.content || "",
+              frustration_level:
+                item.emotion?.frustration_level ?? null,
+              emotion: item.emotion?.label || null,
+            }));
+
+          const completedSession = {
+            ...logData,
+            session_id: logData.session_id || sessionId,
+            persona:
+              logData.persona ||
+              logData.meta?.config?.persona ||
+              "",
+            scenario:
+              logData.scenario ||
+              logData.meta?.config?.scenario ||
+              "",
+            frustration_level:
+              logData.frustration_level ??
+              logData.meta?.config?.frustration_level ??
+              5,
+            turn_count:
+              logData.turn_count ??
+              logData.meta?.turn_count ??
+              history.length,
+            emotion:
+              logData.meta?.final_emotion
+                ? {
+                    label:
+                      logData.meta.final_emotion.label ||
+                      "Unknown",
+                    intensity:
+                      logData.meta.final_emotion.frustration_level ??
+                      0,
+                  }
+                : null,
+            finished: Boolean(
+              logData.finished || logData.meta?.finished
+            ),
+            history,
+          };
+
+          setSession(completedSession);
+
+          // If this is a completed saved session, show the result.
+          if (completedSession.finished) {
+            navigate(`/session/${sessionId}/result`, {
+              replace: true,
+            });
+            return;
+          }
+        } catch (logError) {
+          console.error(
+            "Failed to load saved session log:",
+            logError
+          );
+
+          setError("Unable to load this session.");
+        }
       } finally {
         setLoading(false);
       }
     }
 
     loadSession();
-  }, [sessionId]);
+  }, [sessionId, navigate]);
 
+  // ==========================================================
+  // SEND AGENT RESPONSE
+  // ==========================================================
   const handleSend = async (event) => {
     event.preventDefault();
 
@@ -84,7 +173,10 @@ function SupportConsole() {
       // --------------------------------------------------
       // 1. Send agent response to Customer Simulator
       // --------------------------------------------------
-      const data = await sendMessage(sessionId, agentMessage);
+      const data = await sendMessage(
+        sessionId,
+        agentMessage
+      );
 
       // --------------------------------------------------
       // 2. Add agent response + customer response
@@ -104,6 +196,14 @@ function SupportConsole() {
           {
             role: "customer",
             content: data.customer_message,
+            frustration_level:
+              data.emotion?.intensity ??
+              data.emotion?.frustration_level ??
+              null,
+            emotion:
+              data.emotion?.label ||
+              data.emotion?.emotion ||
+              null,
           },
         ],
       }));
@@ -111,7 +211,20 @@ function SupportConsole() {
       setMessage("");
 
       // --------------------------------------------------
-      // 3. Analyze the CUSTOMER'S new message
+      // 3. IMPORTANT:
+      // If the simulator has completed the conversation,
+      // immediately go to the Session Result page.
+      // --------------------------------------------------
+      if (data.finished) {
+        navigate(`/session/${sessionId}/result`, {
+          replace: true,
+        });
+
+        return;
+      }
+
+      // --------------------------------------------------
+      // 4. Analyze the CUSTOMER'S new message
       // --------------------------------------------------
       try {
         setAnalysisLoading(true);
@@ -147,16 +260,26 @@ function SupportConsole() {
     }
   };
 
+  // ==========================================================
+  // MANUALLY END SESSION
+  // ==========================================================
   const handleEndSession = async () => {
     try {
       await endSession(sessionId);
-      navigate(`/session/${sessionId}/result`);
+
+      navigate(`/session/${sessionId}/result`, {
+        replace: true,
+      });
     } catch (err) {
       console.error("Failed to end session:", err);
+
       setError("Unable to end the session.");
     }
   };
 
+  // ==========================================================
+  // LOADING
+  // ==========================================================
   if (loading) {
     return (
       <div className="console-page">
@@ -167,6 +290,9 @@ function SupportConsole() {
     );
   }
 
+  // ==========================================================
+  // ERROR
+  // ==========================================================
   if (!session) {
     return (
       <div className="console-page">
@@ -177,6 +303,9 @@ function SupportConsole() {
     );
   }
 
+  // ==========================================================
+  // MAIN UI
+  // ==========================================================
   return (
     <div className="console-page">
 
@@ -212,7 +341,8 @@ function SupportConsole() {
             <h2>Customer Support Session</h2>
 
             <p>
-              Practice handling the customer conversation in real time.
+              Practice handling the customer conversation
+              in real time.
             </p>
           </div>
 
@@ -325,6 +455,7 @@ function SupportConsole() {
               </button>
 
             </form>
+
           </div>
 
           {/* ==================================================
@@ -379,12 +510,14 @@ function SupportConsole() {
               ) : analysis ? (
                 <>
                   {/* Intent */}
+
                   <p>
                     <strong>Intent:</strong>{" "}
                     {analysis.intent || "Unknown"}
                   </p>
 
                   {/* Emotion */}
+
                   <p>
                     <strong>Emotion:</strong>{" "}
                     {analysis.emotion_label ||
@@ -393,12 +526,14 @@ function SupportConsole() {
                   </p>
 
                   {/* Sentiment */}
+
                   <p>
                     <strong>Sentiment:</strong>{" "}
                     {analysis.sentiment || "Unknown"}
                   </p>
 
                   {/* Frustration */}
+
                   <p>
                     <strong>Frustration:</strong>{" "}
                     {analysis.frustration_level ??
@@ -408,20 +543,27 @@ function SupportConsole() {
                   </p>
 
                   {/* Satisfaction Trend */}
+
                   <p>
-                    <strong>Satisfaction Trend:</strong>{" "}
+                    <strong>
+                      Satisfaction Trend:
+                    </strong>{" "}
                     {analysis.satisfaction_trend ||
                       "Unknown"}
                   </p>
 
                   {/* Escalation Risk */}
+
                   <p>
-                    <strong>Escalation Risk:</strong>{" "}
+                    <strong>
+                      Escalation Risk:
+                    </strong>{" "}
                     {analysis.escalation_risk ||
                       "Unknown"}
                   </p>
 
                   {/* Confidence */}
+
                   <p>
                     <strong>Confidence:</strong>{" "}
                     {analysis.confidence !== undefined
@@ -433,7 +575,8 @@ function SupportConsole() {
                 </>
               ) : (
                 <p>
-                  Analysis will appear after a customer response.
+                  Analysis will appear after a customer
+                  response.
                 </p>
               )}
             </div>
@@ -457,8 +600,8 @@ function SupportConsole() {
                 </ul>
               ) : (
                 <p>
-                  Stay calm, acknowledge the customer's concern,
-                  and provide a clear next step.
+                  Stay calm, acknowledge the customer's
+                  concern, and provide a clear next step.
                 </p>
               )}
             </div>
@@ -575,7 +718,9 @@ function SupportConsole() {
           </aside>
 
         </section>
+
       </main>
+
     </div>
   );
 }

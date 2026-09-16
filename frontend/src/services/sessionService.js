@@ -1,12 +1,6 @@
 import api from "./api";
 
 export async function startSession(sessionData) {
-  const severityMap = {
-    low: 3,
-    medium: 5,
-    high: 8,
-  };
-
   const scenarioMap = {
     delayed_order: "delayed_order",
     refund_request: "refund_request",
@@ -30,19 +24,11 @@ export async function startSession(sessionData) {
       scenario:
         scenarioMap[sessionData.scenario] || sessionData.scenario,
 
-      initial_emotion: sessionData.initial_emotion,
-
-      issue_severity:
-        severityMap[sessionData.severity] || 5,
-
-      patience_level:
+      frustration_level:
         Number(sessionData.patience) || 5,
 
       expected_resolution:
-        resolutionMap[sessionData.scenario] ||
-        "technical_resolution",
-
-      use_llm: true,
+        resolutionMap[sessionData.scenario] || "full_refund",
     });
 
     return response.data;

@@ -243,6 +243,9 @@ def get_session(session_id: str):
 # ==========================================================
 # SESSION LOG
 # ==========================================================
+# ==========================================================
+# SESSION LOG
+# ==========================================================
 @app.get("/session/{session_id}/log")
 def get_log(session_id: str):
     sim = SESSIONS.get(session_id)
@@ -256,8 +259,134 @@ def get_log(session_id: str):
         raise HTTPException(status_code=404, detail="Log not found")
 
     with open(path, "r", encoding="utf-8") as file:
-        return json.load(file)
+        data = json.load(file)
 
+    # ------------------------------------------------------
+    # NEW LOG FORMAT
+    # If the log already contains meta + conversation,
+    # return it directly.
+    # ------------------------------------------------------
+    if "meta" in data and "conversation" in data:
+        return data
+
+    # ------------------------------------------------------
+    # OLD LOG FORMAT
+    # Convert:
+    #   history
+    # into:
+    #   meta + conversation
+    #
+    # This keeps old session logs compatible with the
+    # current React frontend.
+    # ------------------------------------------------------
+    history = data.get("history", [])
+
+    conversation = []
+
+    for index, item in enumerate(history, start=1):
+        role = item.get("role", "unknown")
+
+        emotion_data = None
+
+        if item.get("emotion") is not None:
+            emotion_data = {
+                "label": item.get("emotion", "Unknown"),
+                "frustration_level": item.get("frustration_level")
+            }
+
+        conversation.append({
+            "turn": index,
+            "timestamp": None,
+            "role": role,
+            "message": item.get("content", ""),
+            "emotion": emotion_data
+        })
+
+    # ------------------------------------------------------
+    # DETERMINE WHETHER THE SESSION WAS COMPLETED
+    # ------------------------------------------------------
+    finished = False
+
+    if history:
+        last_message = str(
+            history[-1].get("content", "")
+        ).lower()
+
+        completion_phrases = [
+            "thank you for resolving",
+            "thank you for your help",
+            "i appreciate your help",
+            "thanks for resolving",
+            "problem is resolved",
+            "issue is resolved",
+            "that resolves",
+            "resolved"
+        ]
+
+        finished = any(
+            phrase in last_message
+            for phrase in completion_phrases
+        )
+
+    # ------------------------------------------------------
+    # BUILD META INFORMATION
+    # ------------------------------------------------------
+    meta = {
+        "session_id": data.get("session_id", session_id),
+        "started_at": None,
+        "ended_at": None,
+        "config": {
+            "persona": data.get("persona"),
+            "scenario": data.get("scenario"),
+            "frustration_level": data.get("frustration_level")
+        },
+        "final_emotion": None,
+        "turn_count": len(history),
+        "finished": finished
+    }
+
+    # ------------------------------------------------------
+    # GET FINAL CUSTOMER EMOTION
+    # ------------------------------------------------------
+    customer_messages = [
+        item
+        for item in history
+        if item.get("role") == "customer"
+    ]
+
+    if customer_messages:
+        final_customer = customer_messages[-1]
+
+        meta["final_emotion"] = {
+            "label": final_customer.get(
+                "emotion",
+                "Unknown"
+            ),
+            "frustration_level": final_customer.get(
+                "frustration_level"
+            )
+        }
+
+    # ------------------------------------------------------
+    # RETURN NORMALIZED SESSION DATA
+    # ------------------------------------------------------
+    return {
+        "session_id": data.get(
+            "session_id",
+            session_id
+        ),
+        "persona": data.get("persona"),
+        "scenario": data.get("scenario"),
+        "frustration_level": data.get(
+            "frustration_level"
+        ),
+        "finished": finished,
+        "meta": meta,
+        "conversation": conversation,
+
+        # Keep history for backward compatibility.
+        "history": history
+    }
 
 # ==========================================================
 # END SESSION
