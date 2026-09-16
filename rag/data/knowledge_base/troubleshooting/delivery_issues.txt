@@ -1,0 +1,45 @@
+DELIVERY AND ORDER TRACKING TROUBLESHOOTING
+
+Problem: Delayed Order
+
+Customers may contact support when an order has not arrived within the expected delivery period or when tracking information has not been updated.
+
+Recommended Steps:
+
+1. Confirm the customer's order number.
+2. Check the latest order and shipment status.
+3. Verify the estimated delivery date.
+4. Check whether the tracking information has been updated recently.
+5. If tracking has not updated for several days, advise the customer that the shipment may require additional carrier processing time.
+6. Provide the customer with the latest available delivery estimate.
+7. If the order is significantly delayed beyond the expected delivery date, contact the shipping provider or escalate the case according to support procedures.
+8. Do not promise an exact delivery time unless the latest tracking information confirms it.
+
+Recommended Customer Response:
+
+Acknowledge the customer's concern about the delayed order.
+
+Provide the latest available tracking or delivery information.
+
+Give a clear next step and realistic timeline.
+
+If the shipment remains delayed or tracking does not update, escalate the issue when appropriate.
+
+Problem: Tracking Not Updated
+
+If tracking information has not changed for several days:
+
+1. Confirm the tracking number.
+2. Check the latest carrier status.
+3. Verify the expected delivery date.
+4. Inform the customer that tracking updates may sometimes be delayed.
+5. Provide the latest available information.
+6. If there has been no update for an extended period, escalate the issue to the appropriate support or shipping team.
+
+Important:
+
+Never invent tracking information.
+
+Never guarantee a delivery date without confirmed information.
+
+Always provide the customer with a clear next step.

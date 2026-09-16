@@ -1,6 +1,5 @@
-from embeddings import model
-from vector_store import load_vector_store
-
+from .embeddings import model
+from .vector_store import load_vector_store
 
 def semantic_search(
     query,

@@ -1,51 +1,60 @@
 """
 FastAPI interface for the Customer Simulator Agent.
+
+Provides:
+- Health check
+- Configuration options
+- Session creation
+- Customer response generation
+- Session state retrieval
+- Session logs
+- Session listing
+- Session deletion
+- Manual customer-message analysis
+- RAG knowledge retrieval
 """
 
-import os
-import sys
-import json
-from typing import Optional, Dict, Any
-from pathlib import Path
+from typing import Dict, Any, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from pathlib import Path
+
+from .config import (
+    API_HOST,
+    API_PORT,
+    DEFAULT_PERSONA,
+    DEFAULT_SCENARIO,
+    DEFAULT_INITIAL_EMOTION,
+    DEFAULT_ISSUE_SEVERITY,
+    DEFAULT_PATIENCE_LEVEL,
+    DEFAULT_EXPECTED_RESOLUTION,
+)
+
+from .personas import (
+    list_personas,
+)
+
+from .scenarios import (
+    list_scenarios,
+)
+
+from .simulator import CustomerSimulator
+
+from rag.retriever import semantic_search
+
 
 # ============================================================
-# PATHS
-# ============================================================
-
-RAG_DIR = Path(__file__).resolve().parent.parent / "rag"
-
-if str(RAG_DIR) not in sys.path:
-    sys.path.insert(0, str(RAG_DIR))
-
-from retriever import semantic_search
-
-from .simulator import CustomerSimulator, create_simulator
-from .personas import list_personas
-from .scenarios import list_scenarios
-from .config import API_HOST, API_PORT, LOG_DIR
-
-
-# ============================================================
-# FRONTEND
-# ============================================================
-
-FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
-INDEX_PATH = FRONTEND_DIR / "index.html"
-
-
-# ============================================================
-# FASTAPI APP
+# APPLICATION
 # ============================================================
 
 app = FastAPI(
-    title="Customer Simulator Agent API",
-    description="Simulate realistic customer conversations for support training & testing.",
+    title="AI Customer Support Coaching Assistant",
+    description=(
+        "Backend API for customer support simulation, "
+        "emotion analysis, coaching and RAG."
+    ),
     version="1.0.0",
 )
 
@@ -70,65 +79,61 @@ app.add_middleware(
 # SESSION STORAGE
 # ============================================================
 
-SESSIONS: Dict[str, CustomerSimulator] = {}
+sessions: Dict[str, CustomerSimulator] = {}
 
 
 # ============================================================
 # REQUEST MODELS
 # ============================================================
 
-class SessionRequest(BaseModel):
-    persona: str = Field("frustrated")
-    scenario: str = Field("refund_request")
 
-    # Current frontend / backend configuration
-    initial_emotion: str = Field("angry")
-    issue_severity: int = Field(7, ge=1, le=10)
-    patience_level: int = Field(5, ge=1, le=10)
+class StartSessionRequest(BaseModel):
+    persona: str = DEFAULT_PERSONA
 
-    expected_resolution: str = Field("full_refund")
-    use_llm: bool = Field(True)
+    scenario: str = DEFAULT_SCENARIO
+
+    initial_emotion: Optional[str] = DEFAULT_INITIAL_EMOTION
+
+    frustration_level: int = Field(
+        default=5,
+        ge=1,
+        le=10,
+    )
+
+    issue_severity: int = Field(
+        default=DEFAULT_ISSUE_SEVERITY,
+        ge=1,
+        le=10,
+    )
+
+    patience_level: int = Field(
+        default=DEFAULT_PATIENCE_LEVEL,
+        ge=1,
+        le=10,
+    )
+
+    expected_resolution: str = DEFAULT_EXPECTED_RESOLUTION
+
+    use_llm: bool = False
 
 
-class AgentMessageRequest(BaseModel):
+class RespondRequest(BaseModel):
     session_id: str
-    message: str = Field(..., min_length=1)
+    message: str
 
 
 class ManualAnalyzeRequest(BaseModel):
-    query: str = Field(..., min_length=1)
+    query: str
+
     persona_hint: Optional[str] = None
+
     scenario_hint: Optional[str] = None
-
-
-# ============================================================
-# FRONTEND ROUTES
-# ============================================================
-
-@app.get("/", response_class=HTMLResponse)
-@app.get("/ui", response_class=HTMLResponse)
-@app.get("/ui/", response_class=HTMLResponse)
-async def serve_ui():
-    if INDEX_PATH.exists():
-        return FileResponse(INDEX_PATH)
-
-    return HTMLResponse(
-        "<h1>Error: frontend/index.html not found</h1>",
-        status_code=404,
-    )
-
-
-if FRONTEND_DIR.exists():
-    app.mount(
-        "/static",
-        StaticFiles(directory=FRONTEND_DIR),
-        name="static",
-    )
 
 
 # ============================================================
 # HEALTH
 # ============================================================
+
 
 @app.get("/health")
 def health():
@@ -142,27 +147,22 @@ def health():
 # CONFIGURATION OPTIONS
 # ============================================================
 
+
 @app.get("/config/options")
-def get_options():
+def config_options():
+
     return {
         "personas": list_personas(),
         "scenarios": list_scenarios(),
-        "emotions": [
-            "calm",
-            "confused",
-            "frustrated",
-            "angry",
-            "impatient",
-            "polite",
-        ],
-        "resolutions": [
+        "expected_resolutions": [
             "full_refund",
             "partial_refund",
             "replacement",
             "store_credit",
-            "cancellation_confirmed",
-            "account_restored",
-            "new_delivery_date",
+            "delivery_update",
+            "technical_resolution",
+            "account_recovery",
+            "cancellation",
         ],
     }
 
@@ -171,167 +171,195 @@ def get_options():
 # START SESSION
 # ============================================================
 
+
 @app.post("/session/start")
-def start_session(req: SessionRequest):
+def start_session(req: StartSessionRequest):
 
     try:
-        sim = create_simulator(
+
+        simulator = CustomerSimulator(
             persona=req.persona,
             scenario=req.scenario,
             initial_emotion=req.initial_emotion,
+            frustration_level=req.frustration_level,
             issue_severity=req.issue_severity,
             patience_level=req.patience_level,
             expected_resolution=req.expected_resolution,
             use_llm=req.use_llm,
         )
 
-        result = sim.start()
+        result = simulator.start()
 
-        SESSIONS[sim.session_id] = sim
+        session_id = result["session_id"]
+
+        sessions[session_id] = simulator
 
         return result
 
-    except KeyError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=str(e),
-        )
+    except Exception as exc:
 
-    except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to start session: {e}",
+            detail=f"Failed to start session: {exc}",
         )
 
 
 # ============================================================
-# RESPOND TO CUSTOMER
+# RESPOND TO SESSION
 # ============================================================
+
 
 @app.post("/session/respond")
-def respond_to_customer(req: AgentMessageRequest):
+def respond_to_session(req: RespondRequest):
 
-    sim = SESSIONS.get(req.session_id)
+    simulator = sessions.get(req.session_id)
 
-    if not sim:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Session '{req.session_id}' not found",
-        )
+    if simulator is None:
 
-    try:
-        result = sim.respond(req.message)
-
-        return result
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Respond failed: {e}",
-        )
-
-
-# ============================================================
-# GET ACTIVE SESSION
-# ============================================================
-
-@app.get("/session/{session_id}")
-def get_session(session_id: str):
-
-    sim = SESSIONS.get(session_id)
-
-    if not sim:
         raise HTTPException(
             status_code=404,
             detail="Session not found",
         )
 
-    return sim.get_state()
+    try:
+
+        result = simulator.respond(req.message)
+
+        return result
+
+    except Exception as exc:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process response: {exc}",
+        )
+
+
+# ============================================================
+# GET SESSION
+# ============================================================
+
+
+@app.get("/session/{session_id}")
+def get_session(session_id: str):
+
+    simulator = sessions.get(session_id)
+
+    if simulator is None:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Session not found",
+        )
+
+    try:
+
+        return simulator.get_state()
+
+    except Exception as exc:
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get session: {exc}",
+        )
 
 
 # ============================================================
 # GET SESSION LOG
 # ============================================================
 
+
 @app.get("/session/{session_id}/log")
 def get_session_log(session_id: str):
 
-    sim = SESSIONS.get(session_id)
+    simulator = sessions.get(session_id)
 
-    # Active session
-    if sim:
-        return sim.logger.get_full_log()
+    # If the session is still active, return its current log
+    if simulator is not None:
+        try:
+            return simulator.get_state()
+        except Exception:
+            pass
 
-    # Completed session
-    log_path = Path(LOG_DIR) / f"session_{session_id}.json"
+    # If the session has ended, load the saved JSON log
+    log_path = Path("customer_simulator") / "logs" / f"session_{session_id}.json"
 
     if log_path.exists():
+        import json
 
-        try:
-            with open(
-                log_path,
-                "r",
-                encoding="utf-8",
-            ) as f:
-                return json.load(f)
-
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to read session log: {e}",
-            )
+        with open(log_path, "r", encoding="utf-8") as f:
+            return json.load(f)
 
     raise HTTPException(
         status_code=404,
         detail="Session not found",
     )
 
+# ============================================================
+# DELETE / END SESSION
+# ============================================================
 
-# ============================================================
-# END SESSION
-# ============================================================
 
 @app.delete("/session/{session_id}")
 def end_session(session_id: str):
+    simulator = sessions.get(session_id)
 
-    sim = SESSIONS.pop(session_id, None)
+    if simulator is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Session not found",
+        )
 
-    if sim:
+    try:
+        # Get the current state before removing the session
+        state = simulator.get_state()
 
-        try:
-            final_state = sim.emotion_mgr.get_state().to_dict()
+        # Finalize the saved conversation log
+        simulator.logger.finalize(
+            simulator.emotion_mgr.get_state().to_dict()
+        )
 
-            sim.logger.finalize(final_state)
+        # Remove the active session from memory
+        sessions.pop(session_id, None)
 
-            return {
-                "status": "ended",
-                "session_id": session_id,
-                "log_path": sim.logger.get_log_path(),
-            }
+        return {
+            "session_id": session_id,
+            "status": "ended",
+            "state": state,
+        }
 
-        except Exception as e:
-
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to finalize session: {e}",
-            )
-
-    return {
-        "status": "not_found",
-        "session_id": session_id,
-    }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to end session: {exc}",
+        )
 
 
 # ============================================================
-# LIST ACTIVE SESSIONS
+# LIST SESSIONS
 # ============================================================
+
 
 @app.get("/sessions")
 def list_sessions():
 
+    results = []
+
+    for session_id, simulator in sessions.items():
+
+        try:
+
+            state = simulator.get_state()
+
+            results.append(state)
+
+        except Exception:
+
+            continue
+
     return {
-        "active": list(SESSIONS.keys()),
-        "count": len(SESSIONS),
+        "sessions": results,
+        "count": len(results),
     }
 
 
@@ -339,10 +367,21 @@ def list_sessions():
 # CUSTOMER MESSAGE ANALYSIS
 # ============================================================
 
+
 @app.post("/analyze")
-def analyze_customer_message(req: ManualAnalyzeRequest):
+def analyze_customer_message(
+    req: ManualAnalyzeRequest,
+):
 
     text = req.query.lower().strip()
+
+    scenario_hint = (
+        req.scenario_hint or ""
+    ).lower().strip()
+
+    persona_hint = (
+        req.persona_hint or ""
+    ).lower().strip()
 
     # ========================================================
     # 1. INTENT DETECTION
@@ -351,18 +390,19 @@ def analyze_customer_message(req: ManualAnalyzeRequest):
     intent = "general_inquiry"
 
     if any(
-        word in text
-        for word in [
+        phrase in text
+        for phrase in [
             "refund",
             "money back",
             "return my money",
+            "refund me",
         ]
     ):
         intent = "refund_request"
 
     elif any(
-        word in text
-        for word in [
+        phrase in text
+        for phrase in [
             "cancel",
             "cancellation",
             "unsubscribe",
@@ -372,8 +412,8 @@ def analyze_customer_message(req: ManualAnalyzeRequest):
         intent = "cancellation"
 
     elif any(
-        word in text
-        for word in [
+        phrase in text
+        for phrase in [
             "late",
             "delayed",
             "not arrived",
@@ -381,13 +421,17 @@ def analyze_customer_message(req: ManualAnalyzeRequest):
             "delivery",
             "shipment",
             "where is my order",
+            "still waiting",
+            "hasn't arrived",
+            "has not arrived",
+            "delivery date",
         ]
     ):
         intent = "delayed_order"
 
     elif any(
-        word in text
-        for word in [
+        phrase in text
+        for phrase in [
             "payment",
             "charged",
             "declined",
@@ -398,8 +442,8 @@ def analyze_customer_message(req: ManualAnalyzeRequest):
         intent = "payment_failure"
 
     elif any(
-        word in text
-        for word in [
+        phrase in text
+        for phrase in [
             "login",
             "password",
             "locked",
@@ -410,8 +454,8 @@ def analyze_customer_message(req: ManualAnalyzeRequest):
         intent = "account_issue"
 
     elif any(
-        word in text
-        for word in [
+        phrase in text
+        for phrase in [
             "return",
             "exchange",
             "replace",
@@ -421,8 +465,8 @@ def analyze_customer_message(req: ManualAnalyzeRequest):
         intent = "return_exchange"
 
     elif any(
-        word in text
-        for word in [
+        phrase in text
+        for phrase in [
             "complaint",
             "complain",
             "terrible service",
@@ -432,162 +476,318 @@ def analyze_customer_message(req: ManualAnalyzeRequest):
         intent = "complaint"
 
     # ========================================================
-    # 2. EMOTION + FRUSTRATION
+    # 2. SCENARIO HINT CAN OVERRIDE GENERIC INTENT
     # ========================================================
 
+    scenario_aliases = {
+        "delayed order": "delayed_order",
+        "delivery issue": "delayed_order",
+        "delivery": "delayed_order",
+        "refund": "refund_request",
+        "refund request": "refund_request",
+        "payment": "payment_failure",
+        "payment issue": "payment_failure",
+        "account": "account_issue",
+        "account issue": "account_issue",
+        "login": "account_issue",
+        "return": "return_exchange",
+        "exchange": "return_exchange",
+        "cancellation": "cancellation",
+        "cancel": "cancellation",
+    }
+
+    normalized_scenario = scenario_aliases.get(
+        scenario_hint,
+        scenario_hint.replace(" ", "_"),
+    )
+
+    if normalized_scenario in [
+        "delayed_order",
+        "refund_request",
+        "payment_failure",
+        "account_issue",
+        "return_exchange",
+        "cancellation",
+    ]:
+        intent = normalized_scenario
+
+    # ========================================================
+    # 3. EMOTION + FRUSTRATION
+    # ========================================================
+
+    # Start from neutral/mild concern.
     emotion_score = 5
 
+    severe_negative_phrases = [
+        "furious",
+        "ridiculous",
+        "unacceptable",
+        "immediately",
+        "manager",
+        "escalating",
+        "escalate",
+        "worst",
+        "horrible",
+        "terrible",
+        "this is ridiculous",
+        "this is unacceptable",
+        "fed up",
+        "sick of",
+        "waste of time",
+        "lawsuit",
+        "legal action",
+        "enough is enough",
+    ]
+
+    frustrated_phrases = [
+        "angry",
+        "frustrated",
+        "upset",
+        "annoyed",
+        "not happy",
+        "disappointed",
+        "already explained",
+        "explained the problem",
+        "already told you",
+        "keep waiting",
+        "still waiting",
+        "what is going on",
+        "what's going on",
+        "give me a clear answer",
+        "clear next step",
+        "need a clear answer",
+        "need an answer",
+        "no update",
+        "still no update",
+        "no response",
+        "why is this taking",
+        "how long",
+        "timeline",
+        "when will",
+        "when can",
+        "taking too long",
+        "taking so long",
+        "please fix this",
+    ]
+
+    worried_phrases = [
+        "confused",
+        "don't understand",
+        "do not understand",
+        "not sure",
+        "unclear",
+        "worried",
+        "concerned",
+        "concern",
+    ]
+
+    positive_phrases = [
+        "thank you",
+        "thanks",
+        "appreciate it",
+        "appreciate your help",
+        "great help",
+        "problem solved",
+        "that works",
+        "perfect",
+        "excellent",
+        "resolved",
+    ]
+
+    # IMPORTANT:
+    # Negative phrases are checked before positive/polite words.
+    #
+    # "Please give me a clear answer" is NOT positive.
+    # "Please fix this" is NOT positive.
+    #
+    # Politeness must not override frustration.
+
     if any(
-        word in text
-        for word in [
-            "furious",
-            "ridiculous",
-            "unacceptable",
-            "immediately",
-            "manager",
-            "escalating",
-            "worst",
-            "horrible",
-        ]
+        phrase in text
+        for phrase in severe_negative_phrases
     ):
+
         emotion_score = 9
 
     elif any(
-        word in text
-        for word in [
-            "angry",
-            "frustrated",
-            "upset",
-            "annoyed",
-            "not happy",
-            "disappointed",
-        ]
+        phrase in text
+        for phrase in frustrated_phrases
     ):
+
         emotion_score = 7
 
     elif any(
-        word in text
-        for word in [
-            "confused",
-            "don't understand",
-            "not sure",
-            "unclear",
-        ]
+        phrase in text
+        for phrase in worried_phrases
     ):
+
         emotion_score = 6
 
     elif any(
-        word in text
-        for word in [
-            "worried",
-            "concerned",
-            "concern",
-        ]
+        phrase in text
+        for phrase in positive_phrases
     ):
-        emotion_score = 6
 
-    elif any(
-        word in text
-        for word in [
-            "please",
-            "thank",
-            "thanks",
-            "appreciate",
-            "kindly",
-        ]
-    ):
         emotion_score = 3
 
     # ========================================================
-    # 3. EMOTION LABEL
+    # 4. SCENARIO-AWARE EMOTION
+    # ========================================================
+
+    if normalized_scenario == "delayed_order":
+
+        delayed_order_phrases = [
+            "where is my order",
+            "still waiting",
+            "not arrived",
+            "late",
+            "delayed",
+            "no update",
+            "timeline",
+            "when will",
+            "already explained",
+            "clear next step",
+            "tracking",
+            "delivery",
+        ]
+
+        if any(
+            phrase in text
+            for phrase in delayed_order_phrases
+        ):
+
+            emotion_score = max(
+                emotion_score,
+                7,
+            )
+
+    # Explicit persona hint provides additional context.
+    if persona_hint in [
+        "frustrated",
+        "angry",
+    ]:
+
+        emotion_score = max(
+            emotion_score,
+            7,
+        )
+
+    # ========================================================
+    # 5. EMOTION LABEL
     # ========================================================
 
     if emotion_score >= 9:
+
         emotion_label = "angry"
 
     elif emotion_score >= 7:
+
         emotion_label = "frustrated"
 
     elif emotion_score == 6:
+
         emotion_label = "worried"
 
     elif emotion_score <= 3:
+
         emotion_label = "happy"
 
     else:
+
         emotion_label = "neutral"
 
     # ========================================================
-    # 4. SENTIMENT
+    # 6. SENTIMENT
     # ========================================================
 
     if emotion_score >= 6:
+
         sentiment = "Negative"
 
     elif emotion_score <= 3:
+
         sentiment = "Positive"
 
     else:
+
         sentiment = "Neutral"
 
     # ========================================================
-    # 5. FRUSTRATION LEVEL
+    # 7. FRUSTRATION LEVEL
     # ========================================================
 
     frustration_level = emotion_score
 
     # ========================================================
-    # 6. ESCALATION RISK
+    # 8. ESCALATION RISK
     # ========================================================
 
     escalation_risk = "low"
 
     if emotion_score >= 8:
+
         escalation_risk = "high"
 
     elif emotion_score >= 6:
+
         escalation_risk = "medium"
 
-    # Explicit escalation language
     if any(
-        word in text
-        for word in [
+        phrase in text
+        for phrase in [
             "manager",
             "escalating",
             "escalate",
             "supervisor",
             "legal action",
+            "lawsuit",
         ]
     ):
+
         escalation_risk = "high"
 
     # ========================================================
-    # 7. SATISFACTION TREND
+    # 9. SATISFACTION TREND
     # ========================================================
 
     if emotion_score >= 7:
+
         satisfaction_trend = "Declining"
 
     elif emotion_score <= 3:
+
         satisfaction_trend = "Improving"
 
     else:
+
         satisfaction_trend = "Stable"
 
     # ========================================================
-    # 8. CONFIDENCE
+    # 10. CONFIDENCE
     # ========================================================
 
     confidence = 0.85
 
     if intent == "general_inquiry":
+
         confidence = 0.65
 
+    if scenario_hint:
+
+        confidence = max(
+            confidence,
+            0.85,
+        )
+
     if escalation_risk == "high":
-        confidence = max(confidence, 0.90)
+
+        confidence = max(
+            confidence,
+            0.90,
+        )
 
     # ========================================================
-    # 9. COACHING GUIDANCE
+    # 11. COACHING GUIDANCE
     # ========================================================
 
     coaching = []
@@ -642,6 +842,18 @@ def analyze_customer_message(req: ManualAnalyzeRequest):
             "Verify the account issue and guide the customer through the recovery steps."
         )
 
+    if intent == "return_exchange":
+
+        coaching.append(
+            "Confirm the return or exchange eligibility and explain the required steps."
+        )
+
+    if intent == "cancellation":
+
+        coaching.append(
+            "Confirm cancellation, stop future billing, and explain any applicable refund policy."
+        )
+
     if escalation_risk == "high":
 
         coaching.append(
@@ -649,11 +861,55 @@ def analyze_customer_message(req: ManualAnalyzeRequest):
         )
 
     # ========================================================
-    # 10. RAG WITH SCENARIO CONTEXT
+    # 12. RAG WITH SCENARIO CONTEXT
     # ========================================================
 
+    scenario_context = {
+
+        "delayed_order": (
+            "delayed order delivery shipment tracking "
+            "late package missing delivery promised date "
+            "carrier in transit"
+        ),
+
+        "refund_request": (
+            "refund money back refund processing "
+            "refund policy damaged product return"
+        ),
+
+        "payment_failure": (
+            "payment failed card declined transaction "
+            "billing payment error subscription"
+        ),
+
+        "account_issue": (
+            "login password account locked sign in "
+            "account recovery subscription account"
+        ),
+
+        "return_exchange": (
+            "return exchange replacement returned product "
+            "damaged product return window"
+        ),
+
+        "cancellation": (
+            "cancel cancellation subscription billing "
+            "unsubscribe stop future charges"
+        ),
+
+        "complaint": (
+            "complaint bad service poor service "
+            "customer complaint service issue"
+        ),
+    }
+
+    context = scenario_context.get(
+        intent,
+        intent.replace("_", " "),
+    )
+
     rag_query = (
-        f"{req.scenario_hint or ''} {req.query}"
+        f"{context} {req.query}"
     ).strip()
 
     try:
@@ -672,7 +928,7 @@ def analyze_customer_message(req: ManualAnalyzeRequest):
         rag_results = []
 
     # ========================================================
-    # 11. SUGGESTED PERSONA
+    # 13. SUGGESTED PERSONA
     # ========================================================
 
     if req.persona_hint:
@@ -696,10 +952,11 @@ def analyze_customer_message(req: ManualAnalyzeRequest):
         suggested_persona = "polite"
 
     # ========================================================
-    # 12. FINAL RESPONSE
+    # 14. FINAL RESPONSE
     # ========================================================
 
     return {
+
         "query": req.query,
 
         "intent": intent,
@@ -734,8 +991,44 @@ def analyze_customer_message(req: ManualAnalyzeRequest):
 
 
 # ============================================================
+# UI / SERVICE ROUTES
+# ============================================================
+
+
+@app.get("/")
+def root():
+
+    return {
+        "service": "AI Customer Support Coaching Assistant",
+        "status": "running",
+        "docs": "/docs",
+    }
+
+
+@app.get("/ui")
+def ui_root():
+
+    return {
+        "service": "AI Customer Support Coaching Assistant",
+        "status": "running",
+        "message": "Frontend is served separately by Vite.",
+    }
+
+
+@app.get("/ui/")
+def ui_slash():
+
+    return {
+        "service": "AI Customer Support Coaching Assistant",
+        "status": "running",
+        "message": "Frontend is served separately by Vite.",
+    }
+
+
+# ============================================================
 # MAIN
 # ============================================================
+
 
 if __name__ == "__main__":
 
