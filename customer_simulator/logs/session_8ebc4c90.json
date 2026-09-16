@@ -1,0 +1,74 @@
+{
+  "session_id": "8ebc4c90",
+  "persona": "polite",
+  "scenario": "refund_request",
+  "frustration_level": 5,
+  "history": [
+    {
+      "role": "customer",
+      "content": "Hi, I received a damaged product in my order. Could you please help me with a refund?",
+      "frustration_level": 1,
+      "emotion": "Calm"
+    },
+    {
+      "role": "agent",
+      "content": "Yaa we are sorry....we will look in to it and we will inform you in 24hrs",
+      "frustration_level": null,
+      "emotion": null
+    },
+    {
+      "role": "customer",
+      "content": "Could you please check the status of my refund request for the damaged product?",
+      "frustration_level": 1,
+      "emotion": "Calm"
+    },
+    {
+      "role": "agent",
+      "content": "No you should wait for a while",
+      "frustration_level": null,
+      "emotion": null
+    },
+    {
+      "role": "customer",
+      "content": "I appreciate your help. Is there any additional information you need from me regarding the refund?",
+      "frustration_level": 2,
+      "emotion": "Calm"
+    },
+    {
+      "role": "agent",
+      "content": "No we are checking please wait",
+      "frustration_level": null,
+      "emotion": null
+    },
+    {
+      "role": "customer",
+      "content": "I'm worried that my refund has not been completed yet. Can you give me an update?",
+      "frustration_level": 3,
+      "emotion": "Concerned"
+    },
+    {
+      "role": "agent",
+      "content": "yaa wait for a while",
+      "frustration_level": null,
+      "emotion": null
+    },
+    {
+      "role": "customer",
+      "content": "I hope everything is okay with the refund process. Could you share the current status?",
+      "frustration_level": 4,
+      "emotion": "Concerned"
+    },
+    {
+      "role": "agent",
+      "content": "You should wait for a while sir",
+      "frustration_level": null,
+      "emotion": null
+    },
+    {
+      "role": "customer",
+      "content": "I'm getting frustrated because my refund is still not sorted out. Can you give me a clear update?",
+      "frustration_level": 5,
+      "emotion": "Frustrated"
+    }
+  ]
+}
