@@ -8,7 +8,12 @@ import {
   endSession,
 } from "../services/sessionService";
 
-import { analyzeMessage } from "../services/coachingService";
+import {
+  analyzeSupport,
+  evaluateResponse,
+  getEscalationThreshold,
+  setEscalationThreshold,
+} from "../services/supportAssistService";
 
 function SupportConsole() {
   const { sessionId } = useParams();
@@ -23,6 +28,80 @@ function SupportConsole() {
   // AI analysis + RAG results
   const [analysis, setAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
+
+  // Task 6: escalation threshold configuration
+  const [threshold, setThreshold] = useState(null);
+  const [thresholdInput, setThresholdInput] = useState("");
+  const [thresholdSaving, setThresholdSaving] = useState(false);
+
+  // Task 6: draft response evaluation
+  const [draftEvaluation, setDraftEvaluation] = useState(null);
+  const [checkingDraft, setCheckingDraft] = useState(false);
+
+  // ==========================================================
+  // LOAD CURRENT ESCALATION THRESHOLD
+  // ==========================================================
+  useEffect(() => {
+    getEscalationThreshold()
+      .then((data) => {
+        setThreshold(data.threshold);
+        setThresholdInput(String(data.threshold));
+      })
+      .catch(() => {
+        /* threshold control is optional */
+      });
+  }, []);
+
+  // ==========================================================
+  // USE THE AI-SUGGESTED RESPONSE
+  // ==========================================================
+  const handleUseSuggestion = (text) => {
+    setMessage(text);
+    setDraftEvaluation(null);
+  };
+
+  // ==========================================================
+  // EVALUATE THE AGENT'S DRAFT BEFORE SENDING
+  // ==========================================================
+  const handleCheckDraft = async () => {
+    if (!message.trim() || checkingDraft) {
+      return;
+    }
+
+    setCheckingDraft(true);
+    setDraftEvaluation(null);
+
+    try {
+      const result = await evaluateResponse(message.trim());
+      setDraftEvaluation(result);
+    } catch (err) {
+      console.error("Failed to evaluate draft:", err);
+    } finally {
+      setCheckingDraft(false);
+    }
+  };
+
+  // ==========================================================
+  // UPDATE THE ESCALATION ALERT THRESHOLD
+  // ==========================================================
+  const handleSaveThreshold = async () => {
+    const value = Number(thresholdInput);
+
+    if (Number.isNaN(value) || value < 0 || value > 100) {
+      return;
+    }
+
+    setThresholdSaving(true);
+
+    try {
+      const result = await setEscalationThreshold(value);
+      setThreshold(result.threshold);
+    } catch (err) {
+      console.error("Failed to update threshold:", err);
+    } finally {
+      setThresholdSaving(false);
+    }
+  };
 
   // ==========================================================
   // LOAD SESSION
@@ -55,10 +134,16 @@ function SupportConsole() {
           try {
             setAnalysisLoading(true);
 
-            const analysisData = await analyzeMessage(
+            // Task 6: full support-assistance pipeline
+            // (intent/sentiment + knowledge + coaching + escalation)
+            const customerTurn =
+              history.filter((item) => item.role === "customer").length ||
+              1;
+
+            const analysisData = await analyzeSupport(
               latestCustomerMessage.content,
-              data.persona || "",
-              data.scenario || ""
+              sessionId,
+              customerTurn
             );
 
             setAnalysis(analysisData);
@@ -224,15 +309,17 @@ function SupportConsole() {
       }
 
       // --------------------------------------------------
-      // 4. Analyze the CUSTOMER'S new message
+      // 4. Run the Task 6 support-assistance pipeline on
+      //    the CUSTOMER'S new message (escalation risk is
+      //    recalculated after every customer message)
       // --------------------------------------------------
       try {
         setAnalysisLoading(true);
 
-        const analysisData = await analyzeMessage(
+        const analysisData = await analyzeSupport(
           data.customer_message,
-          session?.persona || "",
-          session?.scenario || ""
+          sessionId,
+          data.turn ?? null
         );
 
         setAnalysis(analysisData);
@@ -376,6 +463,50 @@ function SupportConsole() {
         )}
 
         {/* ==================================================
+            ESCALATION ALERT (Task 6)
+        ================================================== */}
+
+        {analysis?.alert?.triggered && (
+          <div
+            className={`alert-banner ${
+              analysis.alert.level === "Critical"
+                ? "critical"
+                : "high"
+            }`}
+          >
+            <div className="alert-banner-header">
+              <strong>
+                🚨 Escalation Alert —{" "}
+                {analysis.alert.level} Risk (
+                {analysis.escalation_score}/100)
+              </strong>
+
+              <span>
+                Threshold: {analysis.alert.threshold}
+              </span>
+            </div>
+
+            <p>{analysis.alert.message}</p>
+
+            {analysis.recommended_actions?.length > 0 && (
+              <div className="alert-actions">
+                <strong>Recommended actions:</strong>
+
+                <ul>
+                  {analysis.recommended_actions.map(
+                    (action, index) => (
+                      <li key={index}>
+                        {action}
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================================================
             MAIN GRID
         ================================================== */}
 
@@ -440,19 +571,89 @@ function SupportConsole() {
                 rows={4}
               />
 
-              <button
-                type="submit"
-                className="primary-button"
-                disabled={
-                  sending ||
-                  !message.trim() ||
-                  session.finished
-                }
-              >
-                {sending
-                  ? "Sending..."
-                  : "Send Response"}
-              </button>
+              <div className="message-form-actions">
+                <button
+                  type="button"
+                  className="check-draft-button"
+                  onClick={handleCheckDraft}
+                  disabled={
+                    checkingDraft ||
+                    !message.trim() ||
+                    sending
+                  }
+                >
+                  {checkingDraft
+                    ? "Checking..."
+                    : "Check my draft"}
+                </button>
+
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={
+                    sending ||
+                    !message.trim() ||
+                    session.finished
+                  }
+                >
+                  {sending
+                    ? "Sending..."
+                    : "Send Response"}
+                </button>
+              </div>
+
+              {draftEvaluation && (
+                <div
+                  className={`draft-evaluation ${
+                    draftEvaluation.meets_standard
+                      ? "pass"
+                      : "warn"
+                  }`}
+                >
+                  <strong>
+                    Draft check —{" "}
+                    {draftEvaluation.overall}/100 ·{" "}
+                    {draftEvaluation.summary}
+                  </strong>
+
+                  <div className="eval-grid">
+                    {[
+                      "tone",
+                      "clarity",
+                      "empathy",
+                      "professionalism",
+                    ].map((dimension) => {
+                      const item =
+                        draftEvaluation[dimension];
+
+                      return (
+                        <div
+                          className="eval-item"
+                          key={dimension}
+                        >
+                          <span className="eval-label">
+                            {dimension}{" "}
+                            {item?.score ?? "-"}
+                          </span>
+
+                          <div className="eval-bar">
+                            <div
+                              className={`eval-bar-fill ${
+                                (item?.score ?? 0) >= 70
+                                  ? "good"
+                                  : "weak"
+                              }`}
+                              style={{
+                                width: `${item?.score ?? 0}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
             </form>
 
@@ -606,6 +807,108 @@ function SupportConsole() {
               )}
             </div>
 
+            {/* ==================================================
+                SUGGESTED RESPONSE (Task 6)
+            ================================================== */}
+
+            <div className="coaching-card suggestion-card">
+              <h4>Suggested Response</h4>
+
+              {analysisLoading ? (
+                <p>Generating suggestion...</p>
+              ) : analysis?.suggested_response ? (
+                <>
+                  <div className="suggestion-text">
+                    {analysis.suggested_response}
+                  </div>
+
+                  <div className="suggestion-actions">
+                    <button
+                      type="button"
+                      className="use-suggestion-button"
+                      onClick={() =>
+                        handleUseSuggestion(
+                          analysis.suggested_response
+                        )
+                      }
+                    >
+                      Use this response
+                    </button>
+                  </div>
+
+                  {analysis.suggested_responses
+                    ?.followup_question && (
+                    <p className="suggestion-followup">
+                      <strong>Ask next:</strong>{" "}
+                      {
+                        analysis.suggested_responses
+                          .followup_question
+                      }
+                    </p>
+                  )}
+
+                  {analysis.response_evaluation && (
+                    <div className="eval-grid">
+                      <strong className="eval-title">
+                        Quality check —{" "}
+                        {analysis.response_evaluation.summary}
+                      </strong>
+
+                      {[
+                        "tone",
+                        "clarity",
+                        "empathy",
+                        "professionalism",
+                      ].map((dimension) => {
+                        const item =
+                          analysis.response_evaluation[dimension];
+
+                        return (
+                          <div
+                            className="eval-item"
+                            key={dimension}
+                          >
+                            <span className="eval-label">
+                              {dimension}{" "}
+                              {item?.score ?? "-"}
+                            </span>
+
+                            <div className="eval-bar">
+                              <div
+                                className={`eval-bar-fill ${
+                                  (item?.score ?? 0) >= 70
+                                    ? "good"
+                                    : "weak"
+                                }`}
+                                style={{
+                                  width: `${item?.score ?? 0}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {analysis.suggested_responses?.knowledge_used
+                    ?.length > 0 && (
+                    <p className="suggestion-source">
+                      Grounded in:{" "}
+                      {analysis.suggested_responses.knowledge_used
+                        .map((k) => k.source)
+                        .join(", ")}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p>
+                  A context-aware reply suggestion will appear
+                  after the customer responds.
+                </p>
+              )}
+            </div>
+
           </aside>
 
           {/* ==================================================
@@ -639,16 +942,120 @@ function SupportConsole() {
               </p>
             </div>
 
-            {/* Escalation Monitor */}
+            {/* ==================================================
+                ESCALATION RISK MONITOR (Task 6)
+            ================================================== */}
 
-            <div className="knowledge-card">
-              <h4>Escalation Monitor</h4>
+            <div className="knowledge-card escalation-card">
 
-              <p>
-                {analysis?.escalation_risk
-                  ? `Current risk: ${analysis.escalation_risk}`
-                  : "Monitor customer emotion and conversation risk throughout the session."}
-              </p>
+              <h4>Escalation Risk Monitor</h4>
+
+              {analysisLoading ? (
+                <p>Assessing escalation risk...</p>
+              ) : (
+                <>
+                  <div className="risk-row">
+                    <span
+                      className={`risk-badge ${
+                        (
+                          analysis?.escalation_level || "Low"
+                        ).toLowerCase()
+                      }`}
+                    >
+                      {analysis?.escalation_level || "Low"}
+                    </span>
+
+                    <span className="risk-score">
+                      {analysis?.escalation_score ?? 0}/100
+                    </span>
+                  </div>
+
+                  <div className="risk-score-bar">
+                    <div
+                      className={`risk-score-fill ${
+                        (
+                          analysis?.escalation_level || "Low"
+                        ).toLowerCase()
+                      }`}
+                      style={{
+                        width: `${analysis?.escalation_score ?? 0}%`,
+                      }}
+                    />
+                  </div>
+
+                  <p className="risk-meta">
+                    Trend: {analysis?.escalation_trend || "unknown"}{" "}
+                    · Turn {analysis?.turn ?? 1} · Negative
+                    streak: {analysis?.negative_streak ?? 0}
+                  </p>
+
+                  {analysis?.escalation_indicators?.length > 0 && (
+                    <div className="indicator-chips">
+                      {analysis.escalation_indicators.map(
+                        (indicator, index) => (
+                          <span
+                            className="indicator-chip"
+                            key={index}
+                            title={indicator.matched_phrase}
+                          >
+                            {indicator.name.replace(/_/g, " ")}{" "}
+                            +{indicator.points}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  )}
+
+                  {analysis?.escalation_reasoning?.length > 0 && (
+                    <div className="reasoning-list">
+                      <strong>Why this score:</strong>
+
+                      <ul>
+                        {analysis.escalation_reasoning.map(
+                          (reason, index) => (
+                            <li key={index}>
+                              {reason}
+                            </li>
+                          )
+                        )}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="threshold-control">
+                    <label htmlFor="threshold-input">
+                      Alert threshold
+                    </label>
+
+                    <div className="threshold-row">
+                      <input
+                        id="threshold-input"
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={thresholdInput}
+                        onChange={(event) =>
+                          setThresholdInput(event.target.value)
+                        }
+                      />
+
+                      <button
+                        type="button"
+                        onClick={handleSaveThreshold}
+                        disabled={thresholdSaving}
+                      >
+                        {thresholdSaving ? "Saving..." : "Save"}
+                      </button>
+                    </div>
+
+                    <small>
+                      Current: {threshold ?? "-"} (0-100). Alerts
+                      fire when the risk score reaches this value.
+                    </small>
+                  </div>
+                </>
+              )}
+
             </div>
 
             {/* ==================================================

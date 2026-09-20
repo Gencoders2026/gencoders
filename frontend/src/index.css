@@ -1374,3 +1374,346 @@
     align-items: flex-start;
   }
 }
+
+/* =========================================================
+   TASK 6 - COACHING, RESPONSE SUGGESTION & ESCALATION RISK
+========================================================= */
+
+/* ---------- Escalation alert banner ---------- */
+
+.alert-banner {
+  background: #fee2e2;
+  border: 1px solid #ef4444;
+  border-radius: 12px;
+  padding: 15px 20px;
+  margin: 20px 0;
+  color: #7f1d1d;
+}
+
+.alert-banner.high {
+  background: #ffedd5;
+  border-color: #f97316;
+  color: #7c2d12;
+}
+
+.alert-banner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.alert-banner-header strong {
+  font-size: 16px;
+}
+
+.alert-banner p {
+  margin: 6px 0;
+  font-size: 14px;
+}
+
+.alert-actions ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.alert-actions li {
+  margin-bottom: 4px;
+}
+
+/* ---------- Suggested response card ---------- */
+
+.suggestion-card .suggestion-text {
+  background: #f0f7ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #1e3a8a;
+  white-space: pre-line;
+}
+
+.suggestion-actions {
+  margin-top: 10px;
+}
+
+.use-suggestion-button {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 9px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.use-suggestion-button:hover {
+  background: #1d4ed8;
+}
+
+.suggestion-followup,
+.suggestion-source {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* ---------- Evaluation score bars ---------- */
+
+.eval-grid {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eval-title {
+  font-size: 13px;
+  color: #374151;
+}
+
+.eval-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.eval-label {
+  flex: 0 0 150px;
+  font-size: 12px;
+  color: #6b7280;
+  text-transform: capitalize;
+}
+
+.eval-bar {
+  flex: 1;
+  height: 8px;
+  background: #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.eval-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+
+.eval-bar-fill.good {
+  background: #22c55e;
+}
+
+.eval-bar-fill.weak {
+  background: #f97316;
+}
+
+/* ---------- Draft evaluation ---------- */
+
+.message-form-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.check-draft-button {
+  background: white;
+  color: #2563eb;
+  border: 1px solid #93c5fd;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.check-draft-button:hover {
+  background: #eff6ff;
+}
+
+.check-draft-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.draft-evaluation {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.draft-evaluation.pass {
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  color: #065f46;
+}
+
+.draft-evaluation.warn {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #7c2d12;
+}
+
+/* ---------- Escalation risk monitor card ---------- */
+
+.escalation-card .risk-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.risk-badge {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.risk-badge.low {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.risk-badge.medium {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.risk-badge.high {
+  background: #ffedd5;
+  color: #7c2d12;
+}
+
+.risk-badge.critical {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.risk-score {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.risk-score-bar {
+  height: 10px;
+  background: #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.risk-score-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.4s ease;
+}
+
+.risk-score-fill.low {
+  background: #22c55e;
+}
+
+.risk-score-fill.medium {
+  background: #eab308;
+}
+
+.risk-score-fill.high {
+  background: #f97316;
+}
+
+.risk-score-fill.critical {
+  background: #ef4444;
+}
+
+.risk-meta {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.indicator-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.indicator-chip {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.reasoning-list {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.reasoning-list ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.reasoning-list li {
+  margin-bottom: 4px;
+}
+
+/* ---------- Threshold control ---------- */
+
+.threshold-control {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.threshold-control label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.threshold-row {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 6px;
+}
+
+.threshold-row input {
+  width: 90px;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.threshold-row button {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.threshold-row button:hover {
+  background: #1d4ed8;
+}
+
+.threshold-row button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.threshold-control small {
+  display: block;
+  font-size: 11px;
+  color: #9ca3af;
+  line-height: 1.5;
+}

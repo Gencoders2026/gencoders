@@ -101,3 +101,103 @@ python build_index.py
 
 6. Run the Application
 streamlit run app.py
+
+---
+
+# Task 6 — Coaching, Response Suggestion & Escalation Risk Monitoring
+
+## Overview
+
+Task 6 adds a real-time **support-assistance module** on top of the
+existing agents (Intent & Sentiment Analysis, Customer Simulator and the
+RAG Knowledge Recommendation agent). It provides:
+
+* **Coaching & Response Suggestion Agent** — generates context-aware
+  response suggestions using customer intent, sentiment, conversation
+  history and knowledge-base results, evaluates them for tone /
+  clarity / empathy / professionalism, and provides actionable
+  communication coaching tips.
+* **Escalation Risk Monitor Agent** — continuously recalculates an
+  escalation-risk score (0–100) after every customer message, identifies
+  indicators (repeated complaints, high frustration, negative sentiment
+  streaks, unresolved issues, supervisor requests, legal / reputation
+  threats), classifies conversations into **Low / Medium / High /
+  Critical**, explains the reasoning, and raises a configurable alert
+  with recommended actions (acknowledge frustration, change approach,
+  or escalate to a human agent).
+
+## Pipeline
+
+```text
+Customer message
+    ↓
+Intent & Sentiment Analysis Agent   (analysis_core.py)
+    ↓
+Knowledge Recommendation Agent      (knowledge_bridge.py → rag/ FAISS)
+    ↓
+Coaching & Response Suggestion Agent(support_assist.py)
+    ↓
+Escalation Risk Monitor Agent       (support_assist.py, session-aware)
+    ↓
+Combined payload → Support Console UI
+```
+
+## New backend endpoints (FastAPI, port 8000)
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| POST | `/support/analyze` | Full integrated pipeline (session-aware escalation state) |
+| POST | `/coaching/evaluate` | Evaluate a drafted response (tone/clarity/empathy/professionalism) |
+| GET  | `/escalation/threshold` | View the alert threshold and risk bands |
+| POST | `/escalation/threshold` | Update the configurable alert threshold (0–100) |
+| GET  | `/escalation/{session_id}` | Escalation-monitor state snapshot for a session |
+| POST | `/analyze` | Legacy endpoint, now enriched with knowledge + suggestions |
+
+Risk levels: **Low** 0–24 · **Medium** 25–49 · **High** 50–74 ·
+**Critical** 75–100. The alert threshold defaults to **70** (env:
+`ESCALATION_ALERT_THRESHOLD`) and can be changed at runtime from the UI
+or via `POST /escalation/threshold`.
+
+## Frontend
+
+The React Support Console (`frontend/`, Vite + React Router) now shows:
+
+* 🚨 an **escalation alert banner** with recommended actions when the
+  configurable threshold is reached,
+* a **Suggested Response** card (context-aware reply + "Use this
+  response" + quality-check bars for tone/clarity/empathy/professionalism),
+* an **Escalation Risk Monitor** card (risk badge, score bar, indicator
+  chips, reasoning, alert-threshold configurator),
+* a **"Check my draft"** button that evaluates the agent's typed reply
+  before it is sent.
+
+## Running Task 6
+
+```bash
+# 1. Backend (FastAPI + support agents + RAG bridge)
+cd customer_simulator
+python -m uvicorn api:app --host 127.0.0.1 --port 8000
+
+# 2. Frontend (Support Console)
+cd frontend
+npm install
+npm run dev          # http://localhost:5173
+
+# 3. Tests (25 checks: agents + API pipeline)
+cd customer_simulator
+python -m pytest test_support_assist.py -v
+```
+
+### Files
+
+```
+customer_simulator/
+├── analysis_core.py          # Intent & Sentiment Analysis core
+├── knowledge_bridge.py       # Knowledge Recommendation (RAG) bridge
+├── support_assist.py         # Coaching agent + Escalation Risk Monitor
+├── api.py                    # FastAPI endpoints incl. /support/analyze
+└── test_support_assist.py    # 25 pytest checks
+frontend/src/
+├── services/supportAssistService.js
+└── pages/SupportConsole.jsx  # alert banner, suggestion card, monitor card
+```
