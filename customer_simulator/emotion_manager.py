@@ -1,16 +1,12 @@
 """
 Emotion / Frustration State Manager for the Customer Simulator.
-Analyzes the quality of the agent reply and changes intensity accordingly.
 """
 
 from typing import Dict, Optional
 from dataclasses import dataclass, field
 import re
 
-try:  # package-relative import
-    from .config import EMOTION_SCALE_MIN, EMOTION_SCALE_MAX
-except ImportError:  # flat import when run directly
-    from config import EMOTION_SCALE_MIN, EMOTION_SCALE_MAX
+from config import EMOTION_SCALE_MIN, EMOTION_SCALE_MAX
 
 
 EMOTION_LABELS = {
@@ -86,87 +82,80 @@ class EmotionManager:
         if initial_intensity is not None:
             start = initial_intensity
         else:
-            start = emotion_start_map.get(initial_emotion.lower(), 5)
+            start = emotion_start_map.get(
+                initial_emotion.lower(),
+                5
+            )
 
-        start = max(EMOTION_SCALE_MIN, min(EMOTION_SCALE_MAX, start))
+        start = max(
+            EMOTION_SCALE_MIN,
+            min(EMOTION_SCALE_MAX, start)
+        )
 
         self.state = EmotionState(
             intensity=start,
             label=EMOTION_LABELS[start],
-            history=[f"init → {start} ({EMOTION_LABELS[start]})"],
+            history=[
+                f"init → {start} ({EMOTION_LABELS[start]})"
+            ],
         )
 
     def get_state(self) -> EmotionState:
         return self.state
 
-    def _score_agent_message(self, agent_message: str) -> float:
-        text = agent_message.lower().strip()
-        score = 0.0
+    def _score_agent_message(self, agent_message: str) -> int:
 
-        # Strong positive
+        text = agent_message.lower()
+        score = 0
+
         for pat in POSITIVE_SIGNALS:
             if re.search(pat, text, re.IGNORECASE):
-                score += 1.6
+                score += 1
 
-        # Empathy
-        empathy_phrases = [
-            "i understand", "i can see", "that must be", "frustrating",
-            "i'm sorry", "sorry for", "apologize", "i hear you",
-            "you're right", "valid concern", "completely understand"
-        ]
-        for phrase in empathy_phrases:
-            if phrase in text:
-                score += 1.2
-                break
-
-        # Concrete action / timeline
-        if re.search(r"\b(within|by|in)\s+\d+\s*(hour|day|business day|working day)s?\b", text):
-            score += 1.4
-        if re.search(r"\b(refund|process|escalate|credit|compensation)\b", text):
-            score += 1.1
-
-        # Negative
         for pat in NEGATIVE_SIGNALS:
             if re.search(pat, text, re.IGNORECASE):
-                score -= 1.7
+                score -= 1
 
-        # Short / vague
-        word_count = len(text.split())
-        if word_count < 7:
-            score -= 1.3
-        elif word_count < 14:
+        if len(agent_message.split()) < 8:
             score -= 0.5
 
-        # Deflection (talking about delivery when customer wants refund)
-        if re.search(r"\b(will be delivered|order will|delivery by|arrive)\b", text) and "refund" not in text:
-            score -= 1.8
+        if any(
+            w in text
+            for w in [
+                "i understand",
+                "i can see",
+                "that must be",
+                "frustrating",
+            ]
+        ):
+            score += 0.5
 
-        return score
+        return int(round(score))
 
     def update(self, agent_message: str) -> EmotionState:
-        raw_score = self._score_agent_message(agent_message)
 
-        # Angry personas need stronger positive signals
-        adjusted = raw_score - (self.persona_modifier * 0.5)
+        raw_delta = self._score_agent_message(agent_message)
 
-        # Quality-based delta
-        if adjusted >= 4.0:
-            delta = -3          # Excellent reply
-        elif adjusted >= 2.5:
-            delta = -2          # Very good reply
-        elif adjusted >= 1.0:
-            delta = -1          # Good reply
-        elif adjusted <= -2.0:
-            delta = +2          # Very bad reply
-        elif adjusted <= -0.7:
-            delta = +1          # Poor reply
+        if raw_delta > 0:
+            # Good support response → frustration decreases
+            delta = -max(1, raw_delta)
+
+        elif raw_delta < 0:
+            # Poor support response → frustration increases
+            delta = max(1, abs(raw_delta))
+
         else:
-            delta = 0           # Neutral
+            # If customer is already frustrated,
+            # frustration remains stable.
+            delta = 0
 
         old_intensity = self.state.intensity
+
+        new_intensity = old_intensity + delta
+
         new_intensity = max(
             EMOTION_SCALE_MIN,
-            min(EMOTION_SCALE_MAX, old_intensity + delta)
+            min(EMOTION_SCALE_MAX, new_intensity)
         )
 
         old_label = self.state.label
@@ -176,17 +165,30 @@ class EmotionManager:
         self.state.label = new_label
 
         self.state.history.append(
-            f"{old_label}({old_intensity}) → {new_label}({new_intensity}) "
-            f"[Δ{delta:+d} | score={raw_score:.1f}]"
+            f"{old_label}({old_intensity}) → "
+            f"{new_label}({new_intensity}) "
+            f"[Δ{delta:+d}]"
         )
 
         return self.state
 
-    def force_set(self, intensity: int, reason: str = "manual") -> EmotionState:
-        intensity = max(EMOTION_SCALE_MIN, min(EMOTION_SCALE_MAX, intensity))
+    def force_set(
+        self,
+        intensity: int,
+        reason: str = "manual"
+    ) -> EmotionState:
+
+        intensity = max(
+            EMOTION_SCALE_MIN,
+            min(EMOTION_SCALE_MAX, intensity)
+        )
+
         self.state.intensity = intensity
         self.state.label = EMOTION_LABELS[intensity]
+
         self.state.history.append(
-            f"force → {intensity} ({self.state.label}) [{reason}]"
+            f"force → {intensity} "
+            f"({self.state.label}) [{reason}]"
         )
+
         return self.state

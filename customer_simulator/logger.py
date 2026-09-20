@@ -3,18 +3,11 @@ Conversation logging for the Customer Simulator.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-try:  # package-relative import
-    from .config import LOG_DIR
-except ImportError:  # flat import when run directly
-    from config import LOG_DIR
+from config import LOG_DIR
 
 
 class ConversationLogger:
@@ -26,7 +19,7 @@ class ConversationLogger:
         self.entries: List[Dict[str, Any]] = []
         self.meta: Dict[str, Any] = {
             "session_id": session_id,
-            "started_at": _utc_now(),
+            "started_at": datetime.utcnow().isoformat() + "Z",
             "ended_at": None,
             "config": {},
             "final_emotion": None,
@@ -46,7 +39,7 @@ class ConversationLogger:
     ):
         entry = {
             "turn": turn_number,
-            "timestamp": _utc_now(),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "role": role,
             "message": message,
             "emotion": emotion,
@@ -58,7 +51,7 @@ class ConversationLogger:
         self._flush()
 
     def finalize(self, final_emotion: Optional[Dict] = None):
-        self.meta["ended_at"] = _utc_now()
+        self.meta["ended_at"] = datetime.utcnow().isoformat() + "Z"
         if final_emotion:
             self.meta["final_emotion"] = final_emotion
         self._flush()

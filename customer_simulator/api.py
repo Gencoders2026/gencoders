@@ -1,24 +1,11 @@
 """
-FastAPI server for the Customer Simulator Agent.
-
-Exposes:
-  * GET  /                     -> web UI
-  * GET  /health               -> health check
-  * GET  /config/options       -> personas, scenarios, resolutions
-  * POST /session/start        -> start a simulated conversation
-  * POST /session/respond      -> send the agent reply, get the next customer message
-  * PATCH /session/{id}/frustration -> manually set frustration
-  * GET  /session/{id}         -> current session state
-  * GET  /session/{id}/log     -> full conversation log
-  * GET  /sessions             -> list active sessions
-  * DELETE /session/{id}       -> end a session
-  * POST /analyze              -> analyze a transcript for coaching
+FastAPI server for Customer Simulator.
 """
 
 import os
 import json
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,22 +13,12 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
-try:  # package-relative imports
-    from .simulator import (
-        CustomerSimulator,
-        create_simulator,
-        PERSONAS,
-        SCENARIOS,
-    )
-    from .config import API_HOST, API_PORT
-except ImportError:  # flat imports when run directly
-    from simulator import (
-        CustomerSimulator,
-        create_simulator,
-        PERSONAS,
-        SCENARIOS,
-    )
-    from config import API_HOST, API_PORT
+from simulator import (
+    CustomerSimulator,
+    create_simulator,
+    PERSONAS,
+    SCENARIOS
+)
 
 
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
@@ -53,11 +30,7 @@ LOG_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(
     title="Customer Simulator Agent",
-    version="2.0",
-    description=(
-        "Simulate realistic customer conversations with a support agent "
-        "using configurable personas, scenarios and emotions."
-    ),
+    version="2.0"
 )
 
 # ==========================================================
@@ -68,7 +41,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 # ==========================================================
@@ -76,19 +49,14 @@ app.add_middleware(
 # ==========================================================
 SESSIONS: Dict[str, CustomerSimulator] = {}
 
-
 # ==========================================================
 # REQUEST MODELS
 # ==========================================================
 class SessionRequest(BaseModel):
     persona: str = "frustrated"
     scenario: str = "refund_request"
-    frustration_level: Optional[int] = Field(default=None, ge=1, le=10)
-    initial_emotion: str = "frustrated"
-    issue_severity: int = Field(default=7, ge=1, le=10)
-    patience_level: int = Field(default=5, ge=1, le=10)
+    frustration_level: int = Field(default=5, ge=1, le=10)
     expected_resolution: str = "full_refund"
-    use_llm: Optional[bool] = None
 
 
 class AgentMessageRequest(BaseModel):
@@ -102,6 +70,13 @@ class FrustrationRequest(BaseModel):
 
 
 class AnalyzeRequest(BaseModel):
+    """
+    Accepts any of these field names for the conversation text:
+    - query
+    - transcript
+    - conversation
+    - text
+    """
     query: Optional[str] = None
     transcript: Optional[str] = None
     conversation: Optional[str] = None
@@ -117,42 +92,12 @@ class AnalyzeRequest(BaseModel):
             or self.conversation
             or self.text
         )
-
         if not content or not str(content).strip():
             raise ValueError(
-                "One of the fields 'query', 'transcript', "
-                "'conversation' or 'text' must be provided and non-empty."
+                "One of the fields 'query', 'transcript', 'conversation' or 'text' must be provided and non-empty."
             )
-
-        self.query = str(content)
+        self.query = str(content).strip()
         return self
-
-
-# ==========================================================
-# HELPERS
-# ==========================================================
-def _normalize_emotion(result: Dict) -> Dict:
-    """Ensure result['emotion'] is a dict with a 'label' field."""
-
-    emotion = result.get("emotion")
-
-    if isinstance(emotion, str):
-        result["emotion"] = {
-            "label": emotion,
-            "frustration_level": result.get("frustration_level"),
-            "band": result.get("emotion_band"),
-        }
-    elif isinstance(emotion, dict):
-        if not emotion.get("label"):
-            emotion["label"] = "Frustrated"
-    else:
-        result["emotion"] = {
-            "label": "Frustrated",
-            "frustration_level": result.get("frustration_level"),
-            "band": result.get("emotion_band"),
-        }
-
-    return result
 
 
 # ==========================================================
@@ -164,10 +109,9 @@ def _normalize_emotion(result: Dict) -> Dict:
 async def home():
     if INDEX_PATH.exists():
         return FileResponse(INDEX_PATH)
-
     return HTMLResponse(
         "<h1>frontend/index.html not found</h1>",
-        status_code=404,
+        status_code=404
     )
 
 
@@ -175,7 +119,7 @@ if FRONTEND_DIR.exists():
     app.mount(
         "/static",
         StaticFiles(directory=str(FRONTEND_DIR)),
-        name="static",
+        name="static"
     )
 
 
@@ -186,7 +130,7 @@ if FRONTEND_DIR.exists():
 def health():
     return {
         "status": "ok",
-        "service": "customer-simulator",
+        "service": "customer-simulator"
     }
 
 
@@ -200,27 +144,18 @@ def options():
             {
                 "value": key,
                 "name": value["name"],
-                "description": value.get("description", ""),
-                "style": value.get("communication_style", ""),
+                "style": value["style"]
             }
             for key, value in PERSONAS.items()
         ],
         "scenarios": [
             {
                 "value": key,
-                "name": value["name"],
-                "description": value.get("description", ""),
+                "name": value["name"]
             }
             for key, value in SCENARIOS.items()
         ],
         "frustration_levels": list(range(1, 11)),
-        "emotions": [
-            "calm",
-            "concerned",
-            "frustrated",
-            "angry",
-            "furious",
-        ],
         "resolutions": [
             "full_refund",
             "partial_refund",
@@ -228,8 +163,8 @@ def options():
             "store_credit",
             "cancellation_confirmed",
             "account_restored",
-            "new_delivery_date",
-        ],
+            "new_delivery_date"
+        ]
     }
 
 
@@ -243,23 +178,15 @@ def start_session(req: SessionRequest):
             persona=req.persona,
             scenario=req.scenario,
             frustration_level=req.frustration_level,
-            initial_emotion=req.initial_emotion,
-            issue_severity=req.issue_severity,
-            patience_level=req.patience_level,
-            expected_resolution=req.expected_resolution,
-            use_llm=req.use_llm,
+            expected_resolution=req.expected_resolution
         )
-
         result = sim.start()
-        result = _normalize_emotion(result)
-
         SESSIONS[sim.session_id] = sim
         return result
-
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to start session: {e}",
+            detail=f"Failed to start session: {e}"
         )
 
 
@@ -269,26 +196,19 @@ def start_session(req: SessionRequest):
 @app.post("/session/respond")
 def respond_to_customer(req: AgentMessageRequest):
     sim = SESSIONS.get(req.session_id)
-
     if not sim:
-        raise HTTPException(
-            status_code=404,
-            detail="Session not found",
-        )
+        raise HTTPException(status_code=404, detail="Session not found")
 
     try:
         if req.frustration_level is not None:
             sim.set_frustration_level(req.frustration_level)
 
         result = sim.respond(req.message)
-        result = _normalize_emotion(result)
-
         return result
-
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Respond failed: {e}",
+            detail=f"Respond failed: {e}"
         )
 
 
@@ -296,25 +216,16 @@ def respond_to_customer(req: AgentMessageRequest):
 # UPDATE FRUSTRATION
 # ==========================================================
 @app.patch("/session/{session_id}/frustration")
-def update_frustration(
-    session_id: str,
-    req: FrustrationRequest,
-):
+def update_frustration(session_id: str, req: FrustrationRequest):
     sim = SESSIONS.get(session_id)
-
     if not sim:
-        raise HTTPException(
-            status_code=404,
-            detail="Session not found",
-        )
+        raise HTTPException(status_code=404, detail="Session not found")
 
     level = sim.set_frustration_level(req.frustration_level)
-    state = _normalize_emotion(sim.get_state())
-
     return {
         "session_id": session_id,
         "frustration_level": level,
-        "emotion": state["emotion"],
+        "emotion": sim._build_response("")["emotion"]
     }
 
 
@@ -324,19 +235,11 @@ def update_frustration(
 @app.get("/session/{session_id}")
 def get_session(session_id: str):
     sim = SESSIONS.get(session_id)
-
     if not sim:
-        raise HTTPException(
-            status_code=404,
-            detail="Session not found",
-        )
-
-    return _normalize_emotion(sim.get_state())
+        raise HTTPException(status_code=404, detail="Session not found")
+    return sim.get_state()
 
 
-# ==========================================================
-# SESSION LOG
-# ==========================================================
 # ==========================================================
 # SESSION LOG
 # ==========================================================
@@ -350,140 +253,11 @@ def get_log(session_id: str):
         path = LOG_DIR / f"session_{session_id}.json"
 
     if not path.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Log not found",
-        )
+        raise HTTPException(status_code=404, detail="Log not found")
 
     with open(path, "r", encoding="utf-8") as file:
-        data = json.load(file)
+        return json.load(file)
 
-    # ------------------------------------------------------
-    # NEW LOG FORMAT
-    # If the log already contains meta + conversation,
-    # return it directly.
-    # ------------------------------------------------------
-    if "meta" in data and "conversation" in data:
-        return data
-
-    # ------------------------------------------------------
-    # OLD LOG FORMAT
-    # Convert:
-    #   history
-    # into:
-    #   meta + conversation
-    #
-    # This keeps old session logs compatible with the
-    # current React frontend.
-    # ------------------------------------------------------
-    history = data.get("history", [])
-
-    conversation = []
-
-    for index, item in enumerate(history, start=1):
-        role = item.get("role", "unknown")
-
-        emotion_data = None
-
-        if item.get("emotion") is not None:
-            emotion_data = {
-                "label": item.get("emotion", "Unknown"),
-                "frustration_level": item.get("frustration_level")
-            }
-
-        conversation.append({
-            "turn": index,
-            "timestamp": None,
-            "role": role,
-            "message": item.get("content", ""),
-            "emotion": emotion_data
-        })
-
-    # ------------------------------------------------------
-    # DETERMINE WHETHER THE SESSION WAS COMPLETED
-    # ------------------------------------------------------
-    finished = False
-
-    if history:
-        last_message = str(
-            history[-1].get("content", "")
-        ).lower()
-
-        completion_phrases = [
-            "thank you for resolving",
-            "thank you for your help",
-            "i appreciate your help",
-            "thanks for resolving",
-            "problem is resolved",
-            "issue is resolved",
-            "that resolves",
-            "resolved"
-        ]
-
-        finished = any(
-            phrase in last_message
-            for phrase in completion_phrases
-        )
-
-    # ------------------------------------------------------
-    # BUILD META INFORMATION
-    # ------------------------------------------------------
-    meta = {
-        "session_id": data.get("session_id", session_id),
-        "started_at": None,
-        "ended_at": None,
-        "config": {
-            "persona": data.get("persona"),
-            "scenario": data.get("scenario"),
-            "frustration_level": data.get("frustration_level")
-        },
-        "final_emotion": None,
-        "turn_count": len(history),
-        "finished": finished
-    }
-
-    # ------------------------------------------------------
-    # GET FINAL CUSTOMER EMOTION
-    # ------------------------------------------------------
-    customer_messages = [
-        item
-        for item in history
-        if item.get("role") == "customer"
-    ]
-
-    if customer_messages:
-        final_customer = customer_messages[-1]
-
-        meta["final_emotion"] = {
-            "label": final_customer.get(
-                "emotion",
-                "Unknown"
-            ),
-            "frustration_level": final_customer.get(
-                "frustration_level"
-            )
-        }
-
-    # ------------------------------------------------------
-    # RETURN NORMALIZED SESSION DATA
-    # ------------------------------------------------------
-    return {
-        "session_id": data.get(
-            "session_id",
-            session_id
-        ),
-        "persona": data.get("persona"),
-        "scenario": data.get("scenario"),
-        "frustration_level": data.get(
-            "frustration_level"
-        ),
-        "finished": finished,
-        "meta": meta,
-        "conversation": conversation,
-
-        # Keep history for backward compatibility.
-        "history": history
-    }
 
 # ==========================================================
 # END SESSION
@@ -491,17 +265,15 @@ def get_log(session_id: str):
 @app.delete("/session/{session_id}")
 def end_session(session_id: str):
     sim = SESSIONS.pop(session_id, None)
-
     if sim:
         return {
             "status": "ended",
             "session_id": session_id,
-            "log_path": str(sim.log_path),
+            "log_path": str(sim.log_path)
         }
-
     return {
         "status": "not_found",
-        "session_id": session_id,
+        "session_id": session_id
     }
 
 
@@ -512,12 +284,12 @@ def end_session(session_id: str):
 def sessions():
     return {
         "active": list(SESSIONS.keys()),
-        "count": len(SESSIONS),
+        "count": len(SESSIONS)
     }
 
 
 # ==========================================================
-# MANUAL ANALYSIS
+# MANUAL ANALYSIS – FULLY FIXED
 # ==========================================================
 @app.post("/analyze")
 def analyze(req: AnalyzeRequest):
@@ -529,10 +301,7 @@ def analyze(req: AnalyzeRequest):
     # ------------------------------------------------------
     if any(w in text_lower for w in ["refund", "money back", "return"]):
         intent = "refund_request"
-    elif any(
-        w in text_lower
-        for w in ["late", "delay", "delayed", "tracking", "not arrived", "hasn't arrived", "hasnt arrived"]
-    ):
+    elif any(w in text_lower for w in ["late", "delay", "delayed", "tracking", "not arrived", "hasn't arrived", "hasnt arrived"]):
         intent = "delayed_order"
     elif any(w in text_lower for w in ["payment", "charged", "declined", "card"]):
         intent = "payment_failure"
@@ -546,25 +315,15 @@ def analyze(req: AnalyzeRequest):
     # ------------------------------------------------------
     # FRUSTRATION / EMOTION
     # ------------------------------------------------------
-    if any(
-        w in text_lower
-        for w in [
-            "furious",
-            "unacceptable",
-            "ridiculous",
-            "manager",
-            "worst",
-            "immediately",
-            "urgent",
-            "urgently",
-        ]
-    ):
+    if any(w in text_lower for w in [
+        "furious", "unacceptable", "ridiculous", "manager",
+        "worst", "immediately", "urgent", "urgently", "this is ridiculous"
+    ]):
         score = 9
         emotion = "Furious"
-    elif any(
-        w in text_lower
-        for w in ["angry", "frustrated", "upset", "annoyed", "not happy"]
-    ):
+    elif any(w in text_lower for w in [
+        "angry", "frustrated", "upset", "annoyed", "not happy"
+    ]):
         score = 7
         emotion = "Angry"
     elif any(w in text_lower for w in ["please", "thank", "appreciate", "thanks"]):
@@ -580,7 +339,6 @@ def analyze(req: AnalyzeRequest):
     # WHAT THE AGENT DID WELL
     # ------------------------------------------------------
     strengths = []
-
     if "sorry" in text_lower or "apologize" in text_lower:
         strengths.append("Agent apologized / showed empathy early.")
     if "understand" in text_lower or "frustration" in text_lower:
@@ -589,6 +347,7 @@ def analyze(req: AnalyzeRequest):
         strengths.append("Agent took ownership and started investigating.")
     if "thank you for contacting" in text_lower:
         strengths.append("Agent used a professional greeting.")
+
     if not strengths:
         strengths.append("No clear strengths detected in this short transcript.")
 
@@ -596,25 +355,16 @@ def analyze(req: AnalyzeRequest):
     # AREAS FOR IMPROVEMENT
     # ------------------------------------------------------
     weaknesses = []
-
     if score >= 7 and "sorry" not in text_lower and "apologize" not in text_lower:
         weaknesses.append("Agent did not clearly apologize for the inconvenience.")
-    if ("urgently" in text_lower or "urgent" in text_lower) and (
-        "priority" not in text_lower
-        and "escalate" not in text_lower
-        and "immediately" not in text_lower
-    ):
-        weaknesses.append(
-            "Customer expressed urgency but agent did not explicitly prioritize or escalate."
-        )
+    if "urgently" in text_lower or "urgent" in text_lower:
+        if "priority" not in text_lower and "escalate" not in text_lower and "immediately" not in text_lower:
+            weaknesses.append("Customer expressed urgency but agent did not explicitly prioritize or escalate.")
     if "looking into it now" in text_lower or "let me check" in text_lower:
-        weaknesses.append(
-            "Agent started investigating but did not give a concrete next step or timeline."
-        )
+        weaknesses.append("Agent started investigating but did not give a concrete next step or timeline.")
     if len(text.splitlines()) < 6:
-        weaknesses.append(
-            "Conversation is very short – more probing questions would help."
-        )
+        weaknesses.append("Conversation is very short – more probing questions would help.")
+
     if not weaknesses:
         weaknesses.append("No major weaknesses identified.")
 
@@ -624,61 +374,60 @@ def analyze(req: AnalyzeRequest):
     coaching = []
 
     if score >= 7:
-        coaching.append(
-            "Start by acknowledging the emotion: "
-            "\u201cI completely understand how frustrating this must be.\u201d"
-        )
-    coaching.append(
-        "Give a clear next step + timeline "
-        "(e.g. \u201cI'm checking the tracking now and will have an update "
-        "for you within 2 minutes.\u201d)"
-    )
+        coaching.append("Start by acknowledging the emotion: “I completely understand how frustrating this must be after 10 days.”")
+    
+    coaching.append("Give a clear next step + timeline (e.g. “I’m checking the tracking now and will have an update for you within 2 minutes.”)")
+
     if intent == "delayed_order":
-        coaching.append(
-            "Proactively offer options: expedited reshipment, partial refund, or full refund."
-        )
-        coaching.append(
-            "Share the tracking number and expected delivery date if available."
-        )
+        coaching.append("Proactively offer options: expedited reshipment, partial refund, or full refund.")
+        coaching.append("Share the tracking number and expected delivery date if available.")
     elif intent == "refund_request":
-        coaching.append(
-            "Confirm refund eligibility and exact processing time (e.g. 3\u20135 business days)."
-        )
-    coaching.append(
-        "End with a reassurance statement and ask if there's anything else you can help with."
-    )
+        coaching.append("Confirm refund eligibility and exact processing time (e.g. 3–5 business days).")
+
+    coaching.append("End with a reassurance statement and ask if there’s anything else you can help with.")
 
     # ------------------------------------------------------
-    # FINAL RESPONSE
+    # FINAL RESPONSE – covers all possible keys the frontend may use
     # ------------------------------------------------------
     return {
+        # Emotion (all possible names)
         "overall_emotion": emotion,
         "emotion": emotion,
         "emotion_label": emotion,
         "customer_emotion": emotion,
         "overall_customer_emotion": emotion,
+
+        # Frustration
         "frustration_score": score,
         "frustration_level": score,
         "frustration": score,
+
+        # Risk
         "escalation_risk": risk,
+
+        # Strengths
         "strengths": strengths,
         "what_agent_did_well": strengths,
         "agent_strengths": strengths,
+
+        # Weaknesses
         "weaknesses": weaknesses,
         "areas_for_improvement": weaknesses,
         "improvement_areas": weaknesses,
+
+        # Coaching (all possible names)
         "coaching_suggestions": coaching,
         "coaching_guidance": coaching,
         "suggestions": coaching,
         "coaching": coaching,
         "improvement_suggestions": coaching,
         "recommendations": coaching,
+
+        # Extra
         "intent": intent,
-        "suggested_persona": (
-            req.persona_hint or ("angry" if score >= 7 else "frustrated")
-        ),
-        "suggested_scenario": (req.scenario_hint or intent),
-        "query": req.query,
+        "suggested_persona": req.persona_hint or ("angry" if score >= 7 else "frustrated"),
+        "suggested_scenario": req.scenario_hint or intent,
+        "query": req.query
     }
 
 
@@ -687,10 +436,9 @@ def analyze(req: AnalyzeRequest):
 # ==========================================================
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(
         "api:app",
         host="127.0.0.1",
-        port=API_PORT,
-        reload=True,
+        port=8000,
+        reload=True
     )

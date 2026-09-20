@@ -346,12 +346,11 @@ button {
                 <div>
                     <label>Customer Persona</label>
                     <select id="persona">
-                        <option value="calm">Calm Customer</option>
-                        <option value="confused">Confused Customer</option>
-                        <option value="frustrated" selected>Frustrated Customer</option>
-                        <option value="impatient">Impatient Customer</option>
-                        <option value="angry">Angry Customer</option>
                         <option value="polite">Polite Customer</option>
+                        <option value="concerned">Concerned Customer</option>
+                        <option value="frustrated" selected>Frustrated Customer</option>
+                        <option value="angry">Angry Customer</option>
+                        <option value="furious">Furious Customer</option>
                     </select>
                 </div>
 
@@ -392,33 +391,6 @@ button {
                         <option value="account_restored">Account Restored</option>
                         <option value="new_delivery_date">New Delivery Date</option>
                     </select>
-                </div>
-
-                <div>
-                    <label>Initial Emotion</label>
-                    <select id="initialEmotion">
-                        <option value="calm">Calm</option>
-                        <option value="confused">Confused</option>
-                        <option value="frustrated" selected>Frustrated</option>
-                        <option value="angry">Angry</option>
-                        <option value="furious">Furious</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label>
-                        Issue Severity:
-                        <span id="severityText">7/10</span>
-                    </label>
-                    <input type="range" id="severity" min="1" max="10" value="7">
-                </div>
-
-                <div>
-                    <label>
-                        Patience Level:
-                        <span id="patienceText">5/10</span>
-                    </label>
-                    <input type="range" id="patience" min="1" max="10" value="5">
                 </div>
             </div>
 
@@ -597,18 +569,6 @@ replyFrustration.addEventListener("input", function () {
     replyLevel.textContent = replyFrustration.value + "/10";
 });
 
-const severity = document.getElementById("severity");
-const severityText = document.getElementById("severityText");
-severity.addEventListener("input", function () {
-    severityText.textContent = severity.value + "/10";
-});
-
-const patience = document.getElementById("patience");
-const patienceText = document.getElementById("patienceText");
-patience.addEventListener("input", function () {
-    patienceText.textContent = patience.value + "/10";
-});
-
 updateLevelUI();
 
 // ======================= MODE SWITCHING =======================
@@ -650,9 +610,6 @@ async function startSimulation() {
     const scenario = document.getElementById("scenario").value;
     const level = Number(frustration.value);
     const resolution = document.getElementById("resolution").value;
-    const initialEmotion = document.getElementById("initialEmotion").value;
-    const issueSeverity = Number(document.getElementById("severity").value);
-    const patienceLevel = Number(document.getElementById("patience").value);
 
     document.getElementById("message").textContent = "Starting simulation...";
 
@@ -664,9 +621,6 @@ async function startSimulation() {
                 persona: persona,
                 scenario: scenario,
                 frustration_level: level,
-                initial_emotion: initialEmotion,
-                issue_severity: issueSeverity,
-                patience_level: patienceLevel,
                 expected_resolution: resolution
             })
         });

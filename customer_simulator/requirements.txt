@@ -1,18 +1,11 @@
-# Core web framework
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 pydantic==2.9.2
-
-# Environment configuration
 python-dotenv==1.0.1
-
-# LLM (OpenAI SDK works against OpenAI AND Groq's compatible endpoint)
 openai==1.51.0
-groq==0.11.0
-
-# HTTP / utilities
 httpx==0.27.2
-requests==2.32.3
 aiofiles==24.1.0
 jinja2==3.1.4
 python-multipart==0.0.12
+streamlit==1.38.0
+requests==2.32.3
