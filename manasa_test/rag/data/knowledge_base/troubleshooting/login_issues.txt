@@ -1,0 +1,91 @@
+LOGIN ISSUES - TROUBLESHOOTING GUIDE
+
+Cannot Log In
+
+Problem:
+The customer cannot access their account.
+
+Recommended Steps:
+
+Verify that the correct email address is being used.
+Verify that the password is entered correctly.
+Check whether Caps Lock is enabled.
+Try signing in again.
+Use the password reset option if the password may be incorrect.
+Forgot Password
+
+Problem:
+The customer cannot remember their password.
+
+Recommended Steps:
+
+Select "Forgot Password" on the login page.
+Enter the email address associated with the account.
+Check the email inbox for the password reset message.
+Check the spam or junk folder.
+Follow the instructions in the reset email.
+
+If the reset email does not arrive:
+
+Confirm that the correct email address was entered.
+Wait a few minutes and try again.
+Contact customer support if the problem continues.
+Account Locked
+
+Problem:
+The account has been temporarily locked after multiple unsuccessful login attempts.
+
+Recommended Steps:
+
+Wait for the temporary lockout period to expire.
+Avoid repeatedly entering incorrect passwords.
+Reset the password if necessary.
+Contact support if the account remains inaccessible.
+Login Verification Problem
+
+Problem:
+The customer cannot complete an email, OTP, or other verification step.
+
+Recommended Steps:
+
+Verify that the email address or phone number is correct.
+Request a new verification code.
+Use the most recently received code.
+Check spam/junk folders for email verification messages.
+Make sure the code has not expired.
+Contact support if verification continues to fail.
+Login Page Not Working
+
+Problem:
+The login page does not load correctly or produces an error.
+
+Recommended Steps:
+
+Refresh the page.
+Clear browser cache and cookies.
+Try a private/incognito browser window.
+Try another supported browser.
+Check the internet connection.
+Disable browser extensions that may interfere with the login page.
+Try again later if the service is temporarily unavailable.
+Account Email Changed or Inaccessible
+
+Problem:
+The customer cannot access the email address associated with the account.
+
+Recommended Steps:
+
+Do not create a duplicate account unless instructed.
+Contact customer support.
+Provide sufficient account information to verify ownership.
+
+Security Notice:
+
+Support staff should never request or store a customer's password, authentication code, recovery code, or other sensitive credentials.
+
+When contacting support, provide:
+
+Account email address.
+Description of the login problem.
+Relevant error message.
+Approximate time the issue occurred.

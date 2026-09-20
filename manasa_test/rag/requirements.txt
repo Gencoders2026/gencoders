@@ -1,0 +1,8 @@
+pypdf
+sentence-transformers
+faiss-cpu
+numpy
+streamlit
+requests
+python-dotenv
+langchain-groq
