@@ -20,6 +20,7 @@ Frustration level is the emotional control.
 
 import uuid
 import json
+import random
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -147,6 +148,9 @@ class CustomerSimulator:
         # Keeps track of messages already displayed.
         self.used_messages = set()
 
+        # Avoid repeating the same persona prefix twice in a row.
+        self._last_prefix = None
+
         # Log folder
         self.log_dir = Path("logs")
         self.log_dir.mkdir(exist_ok=True)
@@ -266,6 +270,15 @@ class CustomerSimulator:
         # RESOLUTION
         # ------------------------------------------------------
 
+        if self._is_resolved(text):
+
+            # A genuine resolution strongly placates the customer,
+            # even if they were very angry before.
+            self.frustration_level = max(
+                1,
+                self.frustration_level - 4
+            )
+
         if (
             self._is_resolved(text)
             and self.frustration_level <= 4
@@ -336,7 +349,13 @@ class CustomerSimulator:
                 "access restored",
                 "account restored",
                 "account is unlocked",
-                "unlocked"
+                "unlocked",
+                "restored",
+                "logged in",
+                "log in now",
+                "login successful",
+                "access is restored",
+                "account access is working"
             ],
 
             "cancellation": [
@@ -621,41 +640,61 @@ class CustomerSimulator:
         if self.persona_name == "polite":
 
             if band in ["angry", "furious"]:
-                message = (
-                    "I am very disappointed with this situation. "
-                    + message
+                message = self._apply_prefix(
+                    message,
+                    [
+                        "I am very disappointed with this situation. ",
+                        "This is really upsetting. ",
+                        "I did not expect this kind of experience. "
+                    ]
                 )
 
         elif self.persona_name == "concerned":
 
             if band in ["angry", "furious"]:
-                message = (
-                    "I'm quite worried about this. "
-                    + message
+                message = self._apply_prefix(
+                    message,
+                    [
+                        "I'm quite worried about this. ",
+                        "This is really concerning me. ",
+                        "I'm getting quite anxious about this. "
+                    ]
                 )
 
         elif self.persona_name == "frustrated":
 
             if band == "calm":
-                message = (
-                    "I'm starting to get concerned. "
-                    + message
+                message = self._apply_prefix(
+                    message,
+                    [
+                        "I'm starting to get concerned. ",
+                        "I'm beginning to lose patience. ",
+                        "This is becoming worrying. "
+                    ]
                 )
 
         elif self.persona_name == "angry":
 
             if band in ["calm", "concerned"]:
-                message = (
-                    "I'm not happy about this. "
-                    + message
+                message = self._apply_prefix(
+                    message,
+                    [
+                        "I'm not happy about this. ",
+                        "This is still frustrating. ",
+                        "I remain unhappy with this. "
+                    ]
                 )
 
         elif self.persona_name == "furious":
 
             if band in ["calm", "concerned", "frustrated"]:
-                message = (
-                    "I'm extremely unhappy with this situation. "
-                    + message
+                message = self._apply_prefix(
+                    message,
+                    [
+                        "I'm extremely unhappy with this situation. ",
+                        "This is absolutely unacceptable to me. ",
+                        "I'm furious about how this is going. "
+                    ]
                 )
 
         # ------------------------------------------------------
@@ -674,6 +713,28 @@ class CustomerSimulator:
         self.used_messages.add(message)
 
         return message
+
+    # ==========================================================
+    # PERSONA PREFIX ROTATION
+    # ==========================================================
+
+    def _apply_prefix(
+        self,
+        message: str,
+        prefixes: list
+    ):
+        """
+        Prepend a persona flavour prefix without repeating the
+        same one twice in a row.
+        """
+
+        choices = [p for p in prefixes if p != self._last_prefix]
+
+        prefix = random.choice(choices)
+
+        self._last_prefix = prefix
+
+        return prefix + message
 
 
     # ==========================================================
