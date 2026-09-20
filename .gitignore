@@ -16,3 +16,8 @@ vector_db/
 .DS_Store
 .vscode/
 .idea/
+
+# Node / frontend dependencies
+node_modules/
+.next/
+dist/
