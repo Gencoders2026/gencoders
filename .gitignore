@@ -2,6 +2,17 @@ venv/
 .venv/
 __pycache__/
 *.pyc
+
+# Secrets
 .env
-vector_db/customer_simulator/logs/
-customer_simulator/logs/*.json 
+
+# Generated session logs
+customer_simulator/logs/
+logs/
+manasa_test/customer_simulator/logs
+vector_db/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

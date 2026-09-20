@@ -1,13 +1,22 @@
 """
-Quick interactive test (no API key needed).
-Usage:  python test_run.py
+Interactive test for the Customer Simulator Agent.
+
+Runs the rule-based engine (no API key required) so the conversation
+can be exercised from the terminal.
+
+Usage:
+    python test_run.py
 """
 
-from simulator import CustomerSimulator
+try:  # package-relative imports
+    from .simulator import CustomerSimulator
+except ImportError:  # flat imports when run directly
+    from simulator import CustomerSimulator
 
 
 def main():
     print("=== Customer Simulator – Interactive Test (rule-based) ===\n")
+
     sim = CustomerSimulator(
         persona="angry",
         scenario="refund_request",
@@ -19,7 +28,7 @@ def main():
 
     result = sim.start()
     print(f"Session: {result['session_id']}")
-    print(f"Emotion: {result['emotion']}")
+    print(f"Emotion: {result['emotion']} ({result['frustration_level']}/10)")
     print(f"Customer: {result['customer_message']}\n")
 
     while not result.get("finished"):
@@ -28,9 +37,14 @@ def main():
             continue
         if agent.lower() in ("quit", "exit", "q"):
             break
+
         result = sim.respond(agent)
-        print(f"\nEmotion: {result['emotion']}")
+        print(
+            f"\nEmotion: {result['emotion']} "
+            f"({result['frustration_level']}/10)"
+        )
         print(f"Customer: {result['customer_message']}\n")
+
         if result.get("finished"):
             print("--- Conversation resolved ---")
             break
