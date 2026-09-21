@@ -140,6 +140,9 @@ class SupportAssistRequest(BaseModel):
     history: Optional[List[HistoryMessage]] = None
     threshold: Optional[int] = Field(default=None, ge=0, le=100)
     turn: Optional[int] = None
+    # Who wrote `query`: "customer" (default) or "agent".
+    # The escalation monitor ONLY ingests customer messages.
+    sender: Optional[str] = "customer"
 
 
 class EvaluateResponseRequest(BaseModel):
@@ -542,10 +545,43 @@ def support_analyze(req: SupportAssistRequest):
     """
     text = req.query.strip()
     text_lower = text.lower()
+    query_sender = (req.sender or "customer").strip().lower()
 
     # ------------------------------------------------------
     # 1. INTENT & SENTIMENT ANALYSIS AGENT
+    #    ALWAYS runs on the latest CUSTOMER message only.
+    #    Agent/support replies are NEVER analysed as customer
+    #    state: they would otherwise overwrite the customer's
+    #    emotion / frustration / risk with agent politeness
+    #    ("sorry", "thank you", ...).
     # ------------------------------------------------------
+    history = [m.model_dump() for m in (req.history or [])]
+    session_key = _session_key(req.session_id, text)
+
+    if query_sender != "customer":
+        # No-op pass-through: the monitor's last customer result is
+        # returned unchanged so agent text can never move the
+        # customer's risk or emotion state.
+        risk, intent, emotion, frustration, sentiment = (
+            ESCALATION_MONITOR.assess_non_customer_message(
+                session_key, text, turn=req.turn,
+            )
+        )
+        return _build_support_assist_response(
+            req=req, text=text, intent=intent, emotion=emotion,
+            frustration=frustration, sentiment=sentiment,
+            knowledge_results=[], suggestions={
+                "primary": "", "alternates": [],
+                "followup_question": "",
+                "knowledge_used": [],
+                "basis": {"skipped": "agent message"},
+            },
+            response_evaluation=None, tips=[],
+            risk=risk,
+            monitor_state=ESCALATION_MONITOR.get_state(session_key),
+            session_key=session_key, history=history,
+        )
+
     intent = detect_intent(text_lower)
     emotion, frustration = detect_emotion(text_lower)
     sentiment = detect_sentiment(text_lower)
@@ -557,11 +593,8 @@ def support_analyze(req: SupportAssistRequest):
 
     # ------------------------------------------------------
     # 4. ESCALATION RISK MONITOR AGENT
-    #    (stateful - updated after every customer message)
+    #    (stateful - updated after every CUSTOMER message)
     # ------------------------------------------------------
-    history = [m.model_dump() for m in (req.history or [])]
-    session_key = _session_key(req.session_id, text)
-
     risk = ESCALATION_MONITOR.assess(
         session_key,
         text,
@@ -571,6 +604,7 @@ def support_analyze(req: SupportAssistRequest):
         frustration_score=frustration,
         turn=req.turn,
         threshold_override=req.threshold,
+        customer_history=history,
     )
 
     # ------------------------------------------------------
@@ -630,9 +664,16 @@ def _build_support_assist_response(
         "turn": risk["turn"],
         "message_count": risk["message_count"],
         "query": text,
+        # The message this analysis belongs to (used by the UI to
+        # avoid displaying stale analyses).
+        "customer_message": risk.get("customer_message", text),
+        "analyzed_customer_message": risk.get(
+            "analyzed_customer_message", True
+        ),
         "history_turns": len(history),
 
         # ---- Intent & Sentiment Analysis Agent ----
+        # ALWAYS the latest CUSTOMER message analysis.
         "intent": intent,
         "emotion": emotion,
         "emotion_label": emotion,
@@ -667,7 +708,7 @@ def _build_support_assist_response(
         "knowledge_available": knowledge_status()["available"],
 
         # ---- Coaching & Response Suggestion Agent ----
-        "suggested_response": suggestions["primary"],
+        "suggested_response": suggestions.get("primary", "") if isinstance(suggestions, dict) else "",
         "suggested_responses": suggestions,
         "response_evaluation": response_evaluation,
         "coaching_tips": tips,
@@ -741,15 +782,6 @@ def escalation_state(session_id: str):
 # ==========================================================
 # RUN
 # ==========================================================
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "api:app",
-        host="127.0.0.1",
-        port=8000,
-        reload=True
-    )
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(

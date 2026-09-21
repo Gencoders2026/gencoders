@@ -38,6 +38,43 @@ def test_detect_intent_general():
     assert ac.detect_intent("hello there") == "general_inquiry"
 
 
+def test_detect_emotion_twice_nobody_helped_is_furious():
+    # Correction case (req 6): explicit repetition + no help must read
+    # as high-frustration customer state.
+    emotion, score = ac.detect_emotion(
+        "i have contacted support twice and nobody has helped me. "
+        "i am extremely frustrated"
+    )
+    assert emotion == "Furious"
+    assert score == 9
+
+
+def test_detect_emotion_supervisor_request_is_furious():
+    emotion, score = ac.detect_emotion(
+        "i want to speak to a supervisor immediately"
+    )
+    assert emotion == "Furious"
+    assert score == 9
+
+
+def test_detect_sentiment_still_frustrated_negative():
+    result = ac.detect_sentiment(
+        "i have contacted support twice and nobody has helped me. "
+        "i am extremely frustrated"
+    )
+    assert result["label"] == "negative"
+    assert result["score"] < 0
+
+
+def test_detect_emotion_polite_customer_stays_calm():
+    # Genuine politeness with no complaint markers must still be Calm.
+    emotion, score = ac.detect_emotion(
+        "thank you so much for the help please"
+    )
+    assert emotion == "Calm"
+    assert score == 3
+
+
 def test_detect_emotion_furious():
     emotion, score = ac.detect_emotion("this is unacceptable and ridiculous")
     assert emotion == "Furious"
@@ -279,6 +316,140 @@ def test_state_snapshot(monitor):
 
 
 # ==========================================================
+# Task 6 correction - role separation & customer-only state
+# ==========================================================
+def test_agent_reply_never_moves_customer_state(monitor):
+    angry = monitor.assess(
+        "s-role",
+        "This is unacceptable and I want a refund right now!",
+        intent="refund_request",
+        sentiment="negative",
+        emotion_label="Furious",
+        frustration_score=9,
+        turn=1,
+    )
+    polite_agent_reply = (
+        "I am so sorry for the inconvenience. Thank you for your "
+        "patience, I will check this and confirm you soon, please."
+    )
+    same, intent, emotion, frustration, sentiment = (
+        monitor.assess_non_customer_message(
+            "s-role", polite_agent_reply, turn=2,
+        )
+    )
+    assert same["escalation_score"] == angry["escalation_score"]
+    assert same["escalation_level"] == angry["escalation_level"]
+    assert same["message_count"] == angry["message_count"]
+    assert same["negative_streak"] == angry["negative_streak"]
+    assert intent == "refund_request"
+    assert emotion == "Furious"
+    assert frustration == 9
+    assert sentiment["label"] == "negative"
+    # No silent state mutation: the store still shows 1 customer
+    # message and no new assessments.
+    assert monitor.get_state("s-role")["message_count"] == 1
+    assert len(monitor.get_state("s-role")["assessments"]) == 1
+
+
+def test_repeated_customer_complaint_recognised_as_high(monitor):
+    first = monitor.assess(
+        "s-repeat-fix",
+        "Hi, my refund has not arrived yet, please check.",
+        intent="refund_request",
+        sentiment="neutral",
+        frustration_score=5,
+        turn=1,
+    )
+    second = monitor.assess(
+        "s-repeat-fix",
+        "I have contacted support twice and nobody has helped me. "
+        "I am extremely frustrated.",
+        intent="refund_request",
+        sentiment="negative",
+        emotion_label="Furious",
+        frustration_score=9,
+        turn=2,
+    )
+    assert second["escalation_score"] > first["escalation_score"]
+    # Req 5/6: repeated + unresolved + high frustration must
+    # meaningfully raise risk (at least High).
+    assert second["escalation_level"] in ("High", "Critical")
+    assert any(
+        "repeat" in line.lower() for line in second["reasoning"]
+    )
+
+
+def test_polite_agent_history_does_not_dilute_customer_risk():
+    fresh = EscalationRiskMonitor(threshold=70)
+    history = [
+        {"role": "customer", "content": "Hi, my refund is late, please check."},
+        {
+            "role": "agent",
+            "content": (
+                "I am so sorry, thank you for your patience, I will "
+                "check and confirm you soon."
+            ),
+        },
+    ]
+    result = fresh.assess(
+        "s-history",
+        "I have contacted support twice and nobody has helped me. "
+        "I am extremely frustrated.",
+        intent="refund_request",
+        sentiment="negative",
+        emotion_label="Furious",
+        frustration_score=9,
+        turn=2,
+        customer_history=history,
+    )
+    assert result["escalation_level"] in ("High", "Critical")
+    assert result["negative_streak"] >= 1
+
+
+def test_supervisor_request_triggers_alert(monitor):
+    first = monitor.assess(
+        "s-super-fix",
+        "Hi, my order is late, please help.",
+        intent="delayed_order",
+        sentiment="neutral",
+        frustration_score=5,
+        turn=1,
+    )
+    second = monitor.assess(
+        "s-super-fix",
+        "Still no delivery and nobody has helped me. I want to speak "
+        "to a supervisor immediately!",
+        intent="delayed_order",
+        sentiment="negative",
+        emotion_label="Furious",
+        frustration_score=9,
+        turn=2,
+    )
+    assert second["escalation_score"] >= 70
+    assert second["escalation_level"] in ("High", "Critical")
+    assert second["alert"]["triggered"] is True
+    assert second["alert"]["threshold"] == 70
+    assert any(
+        "supervisor" in line.lower() for line in second["reasoning"]
+    )
+    assert first["escalation_score"] < second["escalation_score"]
+
+
+def test_customer_history_filters_agent_entries():
+    texts = EscalationRiskMonitor._customer_history_texts([
+        {"role": "customer", "content": "The refund is still late."},
+        {"role": "agent", "content": "Sorry, thank you, will check soon."},
+        {"content": "Also my order never arrived."},
+        {"role": "support", "content": "Please wait patiently."},
+        "not-a-dict",
+    ])
+    assert texts == [
+        "the refund is still late.",
+        "also my order never arrived.",
+    ]
+
+
+# ==========================================================
 # API endpoints (TestClient)
 # ==========================================================
 @pytest.fixture(scope="module")
@@ -392,5 +563,126 @@ def test_legacy_analyze_still_works(client):
     assert "suggested_response" in data
     assert "coaching_tips" in data
     assert "knowledge_results" in data
+
+
+# ==========================================================
+# Task 6 correction - API flow: customer/agent/full history
+# ==========================================================
+def test_support_analyze_angry_then_polite_agent_reply(client):
+    angry = client.post(
+        "/support/analyze",
+        json={
+            "query": (
+                "This is unacceptable and I want a refund right now!"
+            ),
+            "session_id": "api-role-fix",
+            "turn": 1,
+        },
+    ).json()
+    assert angry["emotion"] == "Furious"
+    assert angry["frustration_level"] == 9
+    assert angry["sentiment"] == "negative"
+
+    agent_reply = client.post(
+        "/support/analyze",
+        json={
+            "query": (
+                "I am so sorry for the inconvenience. Thank you for "
+                "your patience, I will check this for you soon, "
+                "please."
+            ),
+            "session_id": "api-role-fix",
+            "sender": "agent",
+            "turn": 2,
+        },
+    ).json()
+    assert agent_reply["emotion"] == angry["emotion"]
+    assert (
+        agent_reply["frustration_level"]
+        == angry["frustration_level"]
+    )
+    assert (
+        agent_reply["escalation_score"]
+        == angry["escalation_score"]
+    )
+    assert (
+        agent_reply["escalation_level"]
+        == angry["escalation_level"]
+    )
+
+
+def test_support_analyze_repeated_complaint_full_flow(client):
+    first = client.post(
+        "/support/analyze",
+        json={
+            "query": (
+                "Hi, my refund has not arrived yet, please check."
+            ),
+            "session_id": "api-repeat-fix",
+            "turn": 1,
+            "history": [
+                {
+                    "role": "customer",
+                    "content": "Hi, will my refund arrive soon?",
+                },
+                {
+                    "role": "agent",
+                    "content": "Sorry, thank you, I will check soon.",
+                },
+            ],
+        },
+    ).json()
+    second = client.post(
+        "/support/analyze",
+        json={
+            "query": (
+                "I have contacted support twice and nobody has "
+                "helped me. I am extremely frustrated."
+            ),
+            "session_id": "api-repeat-fix",
+            "turn": 2,
+            "history": [
+                {
+                    "role": "customer",
+                    "content": "Hi, my refund has not arrived yet.",
+                },
+                {
+                    "role": "agent",
+                    "content": "Sorry, thank you, I will check soon.",
+                },
+            ],
+        },
+    ).json()
+    assert second["frustration_level"] == 9
+    assert second["sentiment"] == "negative"
+    assert second["escalation_level"] in ("High", "Critical")
+    assert (
+        second["escalation_score"] > first["escalation_score"]
+    )
+
+
+def test_support_analyze_supervisor_alert_flow(client):
+    polite = client.post(
+        "/support/analyze",
+        json={
+            "query": "Hi, my order is late, please help.",
+            "session_id": "api-super-fix",
+            "turn": 1,
+        },
+    ).json()
+    demand = client.post(
+        "/support/analyze",
+        json={
+            "query": (
+                "Still no delivery and nobody has helped me. I want "
+                "to speak to a supervisor immediately!"
+            ),
+            "session_id": "api-super-fix",
+            "turn": 2,
+        },
+    ).json()
+    assert demand["escalation_level"] in ("High", "Critical")
+    assert demand["alert"]["triggered"] is True
+    assert polite["escalation_score"] < demand["escalation_score"]
 
 

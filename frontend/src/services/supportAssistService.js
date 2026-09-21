@@ -6,19 +6,31 @@ import api from "./api";
  * Talks to the integrated pipeline endpoint:
  *   Intent & Sentiment -> Knowledge Recommendation ->
  *   Coaching & Response Suggestion -> Escalation Risk Monitor
+ *
+ * IMPORTANT: `query` must ALWAYS be the latest CUSTOMER message.
+ * The backend analyses only customer-written text; agent replies
+ * must never be sent as `query` (see `sender` + enforced no-op).
  */
 export async function analyzeSupport(
   query,
   sessionId = null,
   turn = null,
-  threshold = null
+  threshold = null,
+  history = null
 ) {
-  const response = await api.post("/support/analyze", {
+  const payload = {
     query,
     session_id: sessionId,
     turn,
     threshold,
-  });
+    sender: "customer",
+  };
+
+  if (history) {
+    payload.history = history;
+  }
+
+  const response = await api.post("/support/analyze", payload);
 
   return response.data;
 }

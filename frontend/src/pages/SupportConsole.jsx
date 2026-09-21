@@ -135,7 +135,10 @@ function SupportConsole() {
             setAnalysisLoading(true);
 
             // Task 6: full support-assistance pipeline
-            // (intent/sentiment + knowledge + coaching + escalation)
+            // (intent/sentiment + knowledge + coaching + escalation).
+            // `query` is ALWAYS the latest CUSTOMER message; the full
+            // role-tagged history is passed so repeat/streak signals
+            // use customer context only.
             const customerTurn =
               history.filter((item) => item.role === "customer").length ||
               1;
@@ -143,10 +146,29 @@ function SupportConsole() {
             const analysisData = await analyzeSupport(
               latestCustomerMessage.content,
               sessionId,
-              customerTurn
+              customerTurn,
+              null,
+              history.map((item) => ({
+                role: item.role,
+                content: item.content,
+              }))
             );
 
             setAnalysis(analysisData);
+            // Mirror the analysed customer state into the console
+            // status area: the UI always shows the latest CUSTOMER
+            // analysis, never the agent draft or reply.
+            setSession((previous) => ({
+              ...previous,
+              emotion: {
+                label:
+                  analysisData.emotion_label || analysisData.emotion,
+                intensity:
+                  analysisData.frustration_level ??
+                  analysisData.frustration_score ??
+                  null,
+              },
+            }));
           } catch (analysisError) {
             console.error(
               "Failed to analyze initial customer message:",
@@ -270,7 +292,13 @@ function SupportConsole() {
       setSession((previous) => ({
         ...previous,
         turn_count: data.turn,
-        emotion: data.emotion,
+        // IMPORTANT (Task 6 correction): `data.emotion` is the
+        // simulator's post-reply customer state estimate, NOT the
+        // analysed customer state. The UI always shows the
+        // analysis state (emotion, frustration, sentiment, risk)
+        // of the latest CUSTOMER message from `/support/analyze`
+        // below, so keep the previous emotion here and let the
+        // fresh customer analysis overwrite it.
         finished: data.finished,
         history: [
           ...(previous?.history || []),
@@ -281,6 +309,11 @@ function SupportConsole() {
           {
             role: "customer",
             content: data.customer_message,
+            // NOTE (Task 6 correction): these per-message simulator
+            // values are informational only. The displayed customer
+            // analysis ALWAYS comes from `/support/analyze` applied
+            // to the latest CUSTOMER message below — never from the
+            // agent reply or the simulator's reply-time estimate.
             frustration_level:
               data.emotion?.intensity ??
               data.emotion?.frustration_level ??
@@ -311,18 +344,58 @@ function SupportConsole() {
       // --------------------------------------------------
       // 4. Run the Task 6 support-assistance pipeline on
       //    the CUSTOMER'S new message (escalation risk is
-      //    recalculated after every customer message)
+      //    recalculated after every customer message).
+      //    NEVER send the agent's own reply here: the backend
+      //    analyses only what the customer wrote.
       // --------------------------------------------------
       try {
         setAnalysisLoading(true);
 
+        const customerTurnCount =
+          (session?.history || []).filter(
+            (item) => item.role === "customer"
+          ).length + 1;
+
+        const updatedHistory = [
+          ...(session?.history || []),
+          { role: "agent", content: agentMessage },
+          { role: "customer", content: data.customer_message },
+        ];
+
         const analysisData = await analyzeSupport(
           data.customer_message,
           sessionId,
-          data.turn ?? null
+          customerTurnCount,
+          null,
+          updatedHistory
         );
 
-        setAnalysis(analysisData);
+        // Only accept analyses that match the customer message we
+        // asked about; stale async responses must not overwrite.
+        setAnalysis((previous) => {
+          if (
+            previous &&
+            previous.customer_message &&
+            previous.customer_message !== data.customer_message &&
+            (analysisData.customer_message || "") !==
+              data.customer_message
+          ) {
+            return previous;
+          }
+          return analysisData;
+        });
+        setSession((previous) => ({
+          ...previous,
+          // Mirror the analysed customer state into the console
+          // header/status: always the displayed customer state.
+          emotion: {
+            label: analysisData.emotion_label || analysisData.emotion,
+            intensity:
+              analysisData.frustration_level ??
+              analysisData.frustration_score ??
+              null,
+          },
+        }));
       } catch (analysisError) {
         console.error(
           "Failed to analyze customer message:",

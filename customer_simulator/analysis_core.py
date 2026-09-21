@@ -53,24 +53,40 @@ def detect_emotion(text_lower: str) -> Tuple[str, int]:
     """
     Detect the customer's emotional state.
 
-    Returns:
-        (emotion_label, frustration_score) where the score is 1-10.
+    IMPORTANT: this must ONLY be called with customer-written text,
+    never with an agent/support reply. Agent politeness ("sorry",
+    "please", "thank you") must not move the customer's emotion
+    toward Calm.
     """
-    if any(w in text_lower for w in [
-        "furious", "unacceptable", "ridiculous", "manager",
-        "worst", "immediately", "urgent", "urgently",
-        "this is ridiculous", "fed up",
-    ]):
+    high_frustration_words = [
+        "furious", "unacceptable", "ridiculous", "worst",
+        "immediately", "urgent", "urgently", "fed up",
+        "this is ridiculous", "extremely frustrated", "extremely",
+        "demand", "escalate", "supervisor", "manager", "nobody",
+        "no one", "never helped", "still waiting", "done waiting",
+    ]
+
+    if any(w in text_lower for w in high_frustration_words):
         return "Furious", 9
 
     if any(w in text_lower for w in [
-        "angry", "frustrated", "upset", "annoyed", "not happy",
+        "angry", "frustrated", "frustrating", "frustration",
+        "upset", "annoyed", "not happy", "not satisfied",
     ]):
         return "Angry", 7
 
-    if any(w in text_lower for w in [
-        "please", "thank", "appreciate", "thanks",
-    ]):
+    calm_words = ["please", "thank", "appreciate", "thanks"]
+    complaint_words = [
+        "refund", "not resolved", "still", "again", "no update",
+        "waiting", "delay", "late", "problem", "issue", "wrong",
+        "broken", "unhappy", "disappointed", "complaint",
+    ]
+
+    if (
+        any(w in text_lower for w in calm_words)
+        and not any(w in text_lower for w in complaint_words)
+        and "not " not in text_lower
+    ):
         return "Calm", 3
 
     return "Frustrated", 5
@@ -81,16 +97,18 @@ def detect_emotion(text_lower: str) -> Tuple[str, int]:
 # ==========================================================
 NEGATIVE_WORDS = [
     "angry", "annoyed", "awful", "bad", "broken", "cancel",
-    "complaint", "disappointed", "disgusted", "fed up", "furious",
-    "horrible", "impossible", "late", "missing", "never", "no help",
-    "not happy", "not resolved", "pathetic", "poor", "refund",
-    "ridiculous", "sad", "slow", "still", "terrible", "unacceptable",
-    "unhappy", "upset", "useless", "waiting", "waste", "worst", "wrong",
+    "complaint", "contacted", "disappointed", "disgusted",
+    "extremely", "fed up", "frustrated", "frustrating", "frustration",
+    "furious", "horrible", "impossible", "late", "missing", "never",
+    "no help", "nobody", "not happy", "not resolved", "not satisfied",
+    "pathetic", "poor", "refund", "ridiculous", "sad", "slow", "still",
+    "terrible", "twice", "unacceptable", "unhappy", "unresolved",
+    "upset", "useless", "waiting", "waste", "worst", "wrong",
 ]
 
 POSITIVE_WORDS = [
     "appreciate", "awesome", "excellent", "fast", "good", "great",
-    "happy", "helpful", "love", "nice", "perfect", "please", "quick",
+    "happy", "helpful", "love", "nice", "perfect", "quick",
     "resolved", "solved", "thank", "thanks", "understood", "wonderful",
 ]
 

@@ -56,6 +56,31 @@ RISK_LEVEL_BANDS: List[Tuple[int, str]] = [
 
 VALID_SENTIMENTS = {"positive", "neutral", "negative"}
 
+# Shared streak vocabulary (customer history only): negatives must
+# outweigh these positives for a past customer message to keep a
+# negative-sentiment streak alive.
+_NEGATIVE_STREAK_WORDS = frozenset([
+    "angry", "annoyed", "awful", "bad", "broken", "cancel",
+    "complaint", "contacted", "disappointed", "disgusted",
+    "extremely", "fed up", "frustrated", "frustrating", "frustration",
+    "furious", "horrible", "impossible", "late", "missing", "never",
+    "no help", "nobody", "not happy", "not resolved", "not satisfied",
+    "pathetic", "poor", "refund", "ridiculous", "sad", "slow", "still",
+    "terrible", "twice", "unacceptable", "unhappy", "unresolved",
+    "upset", "useless", "waiting", "waste", "worst", "wrong",
+])
+_POSITIVE_STREAK_WORDS = frozenset([
+    "appreciate", "awesome", "excellent", "fast", "good", "great",
+    "happy", "helpful", "love", "nice", "perfect", "quick",
+    "resolved", "solved", "thank", "thanks", "understood", "wonderful",
+])
+
+# Multi-word negatives must also count in the streak check, where
+# `re.findall(r"[a-z']+")` drops spaces.
+_NEGATIVE_STREAK_PHRASES = frozenset([
+    "fed up", "no help", "not happy", "not resolved", "not satisfied",
+])
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -612,23 +637,24 @@ class EscalationRiskMonitor:
     escalation-risk score after every customer message.
 
     Score composition (0-100):
-        supervisor_request      +30
+        supervisor_request      +35
         legal_or_bank_threat    +20
         reputation_threat       +15
-        unresolved_issue        +12
+        unresolved_issue        +16
         cancellation_threat     +10
         urgency_pressure         +8
         repeated complaints   +12..24
-        high frustration       +4..15
+        high frustration       +5..18
         negative sentiment
         streak (>=2 messages) +10..15
+        explicit demand + unresolved compound   +10
 
     Levels:  Low <25 | Medium 25-49 | High 50-74 | Critical >=75
     """
 
     INDICATOR_PATTERNS = {
         "supervisor_request": (
-            30,
+            35,
             [
                 "supervisor", "manager", "escalate",
                 "higher department", "someone else", "real person",
@@ -654,13 +680,16 @@ class EscalationRiskMonitor:
             ],
         ),
         "unresolved_issue": (
-            12,
+            16,
             [
                 "still", "again", "not resolved", "isn't resolved",
-                "no update", "third time", "fourth time",
+                "unresolved", "no update", "third time", "fourth time",
                 "keeps happening", "same issue", "same problem",
                 "nothing happened", "no solution", "waiting since",
-                "how long", "when will",
+                "how long", "when will", "contacted support",
+                "contacted you", "twice", "two times",
+                "nobody has helped", "nobody helped", "no one has helped",
+                "no help",
             ],
         ),
         "cancellation_threat": (
@@ -681,9 +710,11 @@ class EscalationRiskMonitor:
     }
 
     REPEAT_COMPLAINT_MARKERS = [
-        "refund", "money back", "not resolved", "still", "again",
-        "no update", "when will", "how long", "waiting",
+        "refund", "money back", "not resolved", "unresolved", "still",
+        "again", "no update", "when will", "how long", "waiting",
         "keeps happening", "same issue", "same problem", "why",
+        "contacted", "twice", "two times", "nobody", "no one",
+        "nobody has helped", "no help",
     ]
 
     INDICATOR_REASONS = {
@@ -761,6 +792,94 @@ class EscalationRiskMonitor:
     def reset_session(self, session_key: str) -> None:
         self._sessions.pop(session_key, None)
 
+    @staticmethod
+    def _same_issue(intent: str, current: str, past: str) -> bool:
+        """Decide whether a past CUSTOMER message is about the same issue."""
+        if not past:
+            return False
+        if intent != "general_inquiry":
+            intent_cues = {
+                "refund_request": ["refund", "money back", "return"],
+                "delayed_order": [
+                    "late", "delay", "tracking", "arrived", "delivery",
+                ],
+                "payment_failure": ["payment", "charged", "declined", "card"],
+                "account_issue": ["login", "password", "locked", "account"],
+                "cancellation": ["cancel", "unsubscribe", "billing"],
+            }.get(intent, [])
+            if intent_cues and any(c in past for c in intent_cues):
+                return True
+            return any(c in past for c in intent.split("_"))
+        current_markers = [
+            m for m in EscalationRiskMonitor.REPEAT_COMPLAINT_MARKERS
+            if m in current
+        ]
+        return (
+            len(current_markers) >= 2
+            and any(m in past for m in current_markers)
+        )
+
+    @staticmethod
+    def _count_customer_negative_streak(
+        current_label: str, customer_past_texts
+    ) -> int:
+        """
+        Trailing negative streak over CUSTOMER history (latest first),
+        excluding the message currently being assessed.
+        """
+        if current_label != "negative":
+            return 0
+        streak = 0
+        for past in reversed(customer_past_texts or []):
+            neg = sum(1 for phrase in _NEGATIVE_STREAK_PHRASES if phrase in past)
+            words = set(re.findall(r"[a-z']+", past))
+            neg += sum(1 for w in words if w in _NEGATIVE_STREAK_WORDS)
+            pos = sum(1 for w in words if w in _POSITIVE_STREAK_WORDS)
+            if neg > pos:
+                streak += 1
+            else:
+                break
+        return streak
+
+    @staticmethod
+    def _customer_history_texts(history: Optional[List[Dict]]) -> List[str]:
+        """
+        Extract CUSTOMER-written text from a role-tagged history.
+
+        Agent/support entries (role agent/support/assistant/bot/system,
+        or matching author/speaker/sender markers) are dropped, so
+        agent politeness can never dilute customer signals. Entries
+        without a role are treated as customer text to stay backward
+        compatible.
+        """
+        texts: List[str] = []
+        for item in history or []:
+            if not isinstance(item, dict):
+                continue
+            role = str(item.get("role", "customer") or "customer").lower()
+            agent_markers = [
+                str(item.get("author", "") or "").lower(),
+                str(item.get("speaker", "") or "").lower(),
+                str(item.get("sender", "") or "").lower(),
+                str(item.get("from", "") or "").lower(),
+            ]
+            if role in ("agent", "support", "assistant", "bot", "system"):
+                continue
+            if any(
+                m in ("agent", "support", "assistant", "bot")
+                for m in agent_markers
+            ):
+                continue
+            content = (
+                item.get("content")
+                if item.get("content") is not None
+                else item.get("message", "")
+            )
+            content = str(content or "").strip()
+            if content:
+                texts.append(content.lower())
+        return texts
+
     def _empty_state(self, session_key: str) -> Dict:
         return {
             "session_key": session_key,
@@ -771,6 +890,9 @@ class EscalationRiskMonitor:
             "alerts": [],
             "last_signature": None,
             "last_result": None,
+            # Analysis snapshot for the latest CUSTOMER message only:
+            # {"intent", "emotion", "frustration", "sentiment"}.
+            "last_analysis": None,
         }
 
     def get_state(self, session_key: str) -> Dict:
@@ -796,6 +918,84 @@ class EscalationRiskMonitor:
             "current": state["last_result"],
         }
 
+    def assess_non_customer_message(
+        self,
+        session_key: str,
+        agent_message: str,
+        turn=None,
+    ):
+        """
+        No-op assessment for AGENT/support messages.
+
+        Returns (last_risk_result, last_intent, last_emotion,
+        last_frustration, last_sentiment) WITHOUT mutating any
+        customer state: message counts, streaks, intent counts,
+        assessments, alerts and signatures are untouched, so agent
+        replies can never move customer risk or emotion.
+        """
+        state = self._sessions.setdefault(
+            session_key, self._empty_state(session_key)
+        )
+        last = state["last_result"]
+
+        if last is None:
+            empty_alert = {
+                "triggered": False,
+                "threshold": self.threshold,
+                "score": 0,
+                "level": "Low",
+                "triggered_at": None,
+                "message": None,
+                "recommended_actions": self.RECOMMENDED_ACTIONS["Low"],
+            }
+            return (
+                {
+                    "session_key": session_key,
+                    "turn": turn if turn is not None else 0,
+                    "escalation_score": 0,
+                    "risk_score": 0,
+                    "escalation_level": "Low",
+                    "escalation_risk": "Low",
+                    "trend": "first_message",
+                    "indicators": [],
+                    "reasoning": [
+                        "No customer message assessed yet — agent "
+                        "text is never analysed as customer state."
+                    ],
+                    "alert": empty_alert,
+                    "recommended_actions": empty_alert[
+                        "recommended_actions"
+                    ],
+                    "message_count": 0,
+                    "negative_streak": 0,
+                    "assessed_at": _utc_now_iso(),
+                },
+                "general_inquiry",
+                "",
+                5,
+                {
+                    "label": "neutral",
+                    "score": 0.0,
+                    "confidence": 0.4,
+                },
+            )
+
+        last_analysis = state.get("last_analysis") or {}
+        return (
+            last,
+            last_analysis.get("intent", "general_inquiry"),
+            last_analysis.get("emotion", ""),
+            last_analysis.get("frustration", 5),
+            last_analysis.get(
+                "sentiment",
+                {
+                    "label": "neutral",
+                    "score": 0.0,
+                    "confidence": 0.4,
+                },
+            ),
+        )
+
     # ------------------------------------------------------
     # Core assessment
     # ------------------------------------------------------
@@ -810,19 +1010,36 @@ class EscalationRiskMonitor:
         frustration_score: int = 5,
         turn=None,
         threshold_override: Optional[int] = None,
+        customer_history: Optional[List[Dict]] = None,
     ) -> Dict:
         """
-        Assess one customer message and update the session risk
-        state. Recalculates the full escalation-risk score, level,
-        indicators, reasoning and alert.
+        Assess one CUSTOMER message and update the session risk state.
+
+        Role contract (enforced end to end):
+        - The caller must ONLY pass customer-written text here.
+          Agent/support replies must go through
+          `assess_non_customer_message`, which is a pure no-op.
+        - The provided `customer_history` is filtered to
+          customer-role entries before use; any agent entries are
+          ignored for risk, streak, repeat and complaint signals.
+
+        Score composition (computed fresh for every assessment from
+        the latest customer message + customer history context, NOT
+        a fixed +/-N per turn):
+        - explicit indicators found in the latest customer message,
+        - frustration read from the latest customer message,
+        - negative-sentiment streak over CUSTOMER messages,
+        - repeat/repeat-complaint signals over CUSTOMER messages.
 
         Idempotent: re-assessing the exact same message and turn
         returns the previous result without double counting.
         """
         if isinstance(sentiment, dict):
-            sentiment = sentiment.get("label", "neutral")
-        if sentiment not in VALID_SENTIMENTS:
-            sentiment = "neutral"
+            sentiment_label = sentiment.get("label", "neutral")
+        else:
+            sentiment_label = sentiment
+        if sentiment_label not in VALID_SENTIMENTS:
+            sentiment_label = "neutral"
 
         state = self._sessions.setdefault(
             session_key, self._empty_state(session_key)
@@ -830,6 +1047,10 @@ class EscalationRiskMonitor:
 
         message = (customer_message or "").strip()
         text_lower = message.lower()
+
+        customer_past_texts = self._customer_history_texts(
+            customer_history
+        )
 
         signature = hashlib.md5(
             f"{turn}|{text_lower}".encode("utf-8")
@@ -862,29 +1083,39 @@ class EscalationRiskMonitor:
                 )
 
         # ---- High frustration ---------------------------------
+        # Read ONLY from the latest CUSTOMER message.
         if frustration_score >= 9:
-            score += 15
+            score += 18
             reasoning.append(
                 "Customer is furious — very high frustration "
-                "level (+15)."
+                "level (+18)."
             )
         elif frustration_score >= 8:
-            score += 12
+            score += 14
             reasoning.append(
-                "Very high frustration level expressed (+12)."
+                "Very high frustration level expressed (+14)."
             )
         elif frustration_score >= 7:
-            score += 8
+            score += 10
             reasoning.append(
-                "Elevated frustration level expressed (+8)."
+                "Elevated frustration level expressed (+10)."
             )
         elif frustration_score >= 6:
-            score += 4
-            reasoning.append("Mildly elevated frustration (+4).")
+            score += 5
+            reasoning.append("Mildly elevated frustration (+5).")
 
-        # ---- Negative sentiment streak -------------------------
-        if sentiment == "negative":
-            state["negative_streak"] += 1
+        # ---- Negative sentiment streak (CUSTOMER messages only) ----
+        # Uses provided customer history when available so a restart
+        # or an adhoc request still sees the real streak; falls back
+        # to the in-memory counter otherwise. Agent entries were
+        # already filtered out of `customer_past_texts`.
+        past_negative_streak = self._count_customer_negative_streak(
+            sentiment_label, customer_past_texts,
+        )
+        if sentiment_label == "negative":
+            state["negative_streak"] = max(
+                state["negative_streak"] + 1, past_negative_streak + 1,
+            )
         else:
             state["negative_streak"] = 0
 
@@ -894,34 +1125,99 @@ class EscalationRiskMonitor:
             score += streak_points
             reasoning.append(
                 f"Negative sentiment in {streak} consecutive "
-                f"messages (+{streak_points})."
+                f"customer messages (+{streak_points})."
             )
 
-        # ---- Repeated complaints -------------------------------
+        # ---- Repeated complaints (CUSTOMER messages only) --------
+        # Context comes from customer-role history entries (agent
+        # replies excluded) plus the monitor's in-memory counters.
         markers_hit = sum(
             1 for m in self.REPEAT_COMPLAINT_MARKERS if m in text_lower
         )
         complaint_like = markers_hit >= 2
-        repeats = state["intent_counts"].get(intent, 0)
+        history_repeats = sum(
+            1 for past in customer_past_texts
+            if self._same_issue(intent, text_lower, past)
+        )
+        counter_repeats = state["intent_counts"].get(intent, 0)
+        repeats = max(counter_repeats, history_repeats, 1) - 1
+
+        # A single customer message that BOTH names an unresolved
+        # issue AND proves repetition ("twice", "contacted support",
+        # "nobody has helped", ...) is itself a repeated complaint:
+        # repeated, unresolved and high-frustration signals compound.
+        explicit_repeat_evidence = any(
+            phrase in text_lower
+            for phrase in (
+                "contacted support", "contacted you", "twice",
+                "two times", "three times", "multiple times",
+                "again and again", "nobody has helped",
+                "nobody helped", "no one has helped",
+                "still no", "still not",
+            )
+        )
+        unresolved_signals = (
+            "unresolved" in text_lower
+            or "not resolved" in text_lower
+            or "no solution" in text_lower
+            or "nothing happened" in text_lower
+        )
 
         if complaint_like:
-            repeat_points = min(24, 12 + 6 * repeats)
+            repeat_points = min(24, 18 + 6 * repeats)
             score += repeat_points
-            if repeats >= 1:
+            if repeats >= 1 or explicit_repeat_evidence:
+                total_mentions = repeats + 1
+                if explicit_repeat_evidence and repeats < 1:
+                    total_mentions = 2
                 reasoning.append(
                     f"Repeated complaint: issue '{intent}' raised "
-                    f"{repeats + 1} times (+{repeat_points})."
+                    f"{total_mentions} times across customer messages "
+                    f"(+{repeat_points})."
                 )
             else:
                 reasoning.append(
                     f"Strong complaint language about "
                     f"'{intent}' (+{repeat_points})."
                 )
-        elif repeats >= 2:
+        elif explicit_repeat_evidence and unresolved_signals:
+            score += 18
+            reasoning.append(
+                f"Repeated unresolved complaint about '{intent}' "
+                f"stated in this customer message (+18)."
+            )
+        elif max(counter_repeats, history_repeats) >= 2:
             score += 6
             reasoning.append(
-                f"Customer has raised '{intent}' {repeats + 1} "
+                f"Customer has raised '{intent}' "
+                f"{max(counter_repeats, history_repeats) + 1} "
                 f"times (+6)."
+            )
+
+        # ---- Compound escalation: explicit demand + unresolved ----
+        # A customer who demands a supervisor/escalation while the
+        # issue is demonstrably unresolved is escalating, not just
+        # venting: add a compound bonus so HIGH/CRITICAL can trigger.
+        explicit_demand = any(
+            phrase in text_lower
+            for phrase in (
+                "supervisor", "manager", "escalate", "human agent",
+                "real person", "someone else",
+            )
+        )
+        unresolved_context = (
+            any(
+                name == "unresolved_issue" for name in
+                [i["name"] for i in indicators]
+            )
+            or explicit_repeat_evidence
+            or max(counter_repeats, history_repeats) >= 1
+        )
+        if explicit_demand and unresolved_context:
+            score += 10
+            reasoning.append(
+                "Escalation demand combined with an unresolved "
+                "issue (+10)."
             )
 
         # ---- Final score / level / trend ------------------------
@@ -950,8 +1246,8 @@ class EscalationRiskMonitor:
 
         if not reasoning:
             reasoning.append(
-                "No strong escalation indicators in this message — "
-                "low conversational risk."
+                "No strong escalation indicators in this customer "
+                "message — low conversational risk."
             )
 
         # ---- Configurable threshold alert -----------------------
@@ -977,11 +1273,27 @@ class EscalationRiskMonitor:
             "recommended_actions": self.RECOMMENDED_ACTIONS[level],
         }
 
-        # ---- Persist session state ------------------------------
+        # ---- Persist session state (CUSTOMER only) ---------------
         state["message_count"] += 1
         state["intent_counts"][intent] = (
             state["intent_counts"].get(intent, 0) + 1
         )
+        state["last_analysis"] = {
+            "intent": intent,
+            "emotion": emotion_label,
+            "frustration": frustration_score,
+            "sentiment": {
+                "label": sentiment_label,
+                "score": (
+                    sentiment.get("score", 0.0)
+                    if isinstance(sentiment, dict) else 0.0
+                ),
+                "confidence": (
+                    sentiment.get("confidence", 0.4)
+                    if isinstance(sentiment, dict) else 0.4
+                ),
+            },
+        }
 
         assessment = {
             "turn": turn if turn is not None else state["message_count"],
@@ -1018,6 +1330,8 @@ class EscalationRiskMonitor:
             "message_count": state["message_count"],
             "negative_streak": state["negative_streak"],
             "assessed_at": assessment["assessed_at"],
+            "customer_message": message,
+            "analyzed_customer_message": True,
         }
 
         state["last_signature"] = signature
