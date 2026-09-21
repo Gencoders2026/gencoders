@@ -133,47 +133,74 @@ class CoachingResponseAgent:
         ),
     }
 
-    INTENT_ACTIONS = {
+    INTENT_NEXT_STEPS = {
         "refund_request": (
-            "I've checked your order and it is eligible for a refund. "
-            "I've initiated the refund now — it will reach your "
-            "original payment method within 3-5 business days, and "
-            "you'll receive a confirmation email shortly."
+            "Would you like me to check the refund eligibility for your "
+            "order and confirm the current refund policy with you?"
         ),
         "delayed_order": (
-            "I've located your parcel and flagged it for priority "
-            "handling — you'll see an updated tracking status within "
-            "24 hours. If it hasn't arrived by then, I'll arrange an "
-            "expedited reshipment or a partial refund, whichever you "
-            "prefer."
+            "Would you like me to look up the current delivery status of "
+            "your order and walk you through the available options?"
         ),
         "payment_failure": (
-            "I've re-checked the transaction and no amount was "
-            "captured on our side. Please retry the payment with the "
-            "same card or an alternative method — if it fails again "
-            "I'll raise it with our payments team immediately."
+            "Would you like me to check what happened with the payment on "
+            "our side and go over the retry options with you?"
         ),
         "account_issue": (
-            "I've sent a password-reset link to your registered "
-            "email — it should arrive within a minute (please check "
-            "spam as well). If it doesn't work, I'll unlock the "
-            "account from our side right away."
+            "Would you like me to walk you through the account-recovery "
+            "steps, or would a password reset be the best next step?"
         ),
         "cancellation": (
-            "I can process the cancellation for you today. Your "
-            "subscription will be cancelled and you will not be "
-            "billed again — I'll email you the confirmation in the "
-            "next few minutes."
+            "Would you like me to confirm what applies to your plan "
+            "before we finalise the cancellation?"
         ),
         "general_inquiry": (
-            "Could you share your order ID so I can pull up the "
-            "exact details and resolve this for you right away?"
+            "Could you share a bit more detail (for example your order ID) "
+            "so I can pull up the exact information and help you from "
+            "there?"
         ),
     }
 
+    # Generic empathic OPENERS, selected by the customer's sentiment /
+    # frustration level (not by persona). Persona affects the CLOSING
+    # tone only via the caller if it chooses.
+
+    EMPATHY_OPENERS = {
+        "calm": (
+            "Thanks for reaching out — I'm happy to help you with this "
+            "right away."
+        ),
+        "frustrated": (
+            "I'm sorry for the inconvenience — I completely understand how "
+            "frustrating this is, and I'll sort it out for you now."
+        ),
+        "negative": (
+            "I'm really sorry about this experience. You're right to be "
+            "upset, and I'm going to take care of this personally right "
+            "now."
+        ),
+        "neutral": (
+            "Thanks for getting in touch. Let me look into this for you "
+            "straight away."
+        ),
+        "positive": (
+            "Thank you for your patience — let me get this wrapped up for "
+            "you."
+        ),
+    }
+
+    # Tone escalators: when frustration is very high we can strengthen
+    # the opener slightly without fabricating any completed action.
+    FRUSTRATION_ESCALATORS = {
+        9: " I understand this is really frustrating, and I'll do my best "
+            "to resolve it for you now.",
+        10: " I completely understand how frustrating this is. I'm going "
+             "to take this on personally and get this sorted out for you.",
+    }
+
     CLOSING = (
-        "Thank you for your patience — is there anything else I can "
-        "help you with while I'm here?"
+        "Thank you for your patience — is there anything else I can help "
+        "you with while I'm here?"
     )
 
     SHORT_CLOSING = "Let me know if there's anything else you need."

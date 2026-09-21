@@ -51,45 +51,84 @@ def detect_intent(text_lower: str) -> str:
 # ==========================================================
 def detect_emotion(text_lower: str) -> Tuple[str, int]:
     """
-    Detect the customer's emotional state.
+    Detect the customer's emotional state and a frustration intensity
+    (1..10) from the meaning and intensity of their message.
+
+    The returned frustration is DYNAMIC: it scales with how much
+    negative/severe language the message contains, not a fixed
+    point-by-point increase.
 
     IMPORTANT: this must ONLY be called with customer-written text,
     never with an agent/support reply. Agent politeness ("sorry",
     "please", "thank you") must not move the customer's emotion
     toward Calm.
     """
-    high_frustration_words = [
-        "furious", "unacceptable", "ridiculous", "worst",
-        "immediately", "urgent", "urgently", "fed up",
-        "this is ridiculous", "extremely frustrated", "extremely",
-        "demand", "escalate", "supervisor", "manager", "nobody",
-        "no one", "never helped", "still waiting", "done waiting",
-    ]
+    # ---- severity vocabulary (each phrase has a weight 1..3) ----
+    severe_words = {  # weight 3 - strongest escalation / fury signals
+        "furious": 3, "unacceptable": 3, "ridiculous": 3, "worst": 3,
+        "escalate": 3, "supervisor": 3, "manager": 3, "demand": 3,
+        "immediately": 3, "urgent": 3, "urgently": 3, "fed up": 3,
+        "never helped": 3, "nobody": 3, "no one": 3, "done waiting": 3,
+        "still waiting": 3, "unhappy": 3, "disgusted": 3, "horrible": 3,
+        "terrible": 3, "pathetic": 3,
+    }
+    strong_words = {  # weight 2 - clear anger / frustration
+        "angry": 2, "frustrated": 2, "frustration": 2, "frustrating": 2,
+        "upset": 2, "annoyed": 2, "not happy": 2, "not satisfied": 2,
+        "awful": 2, "bad": 2, "broken": 2, "cancel": 2, "complaint": 2,
+        "disappointed": 2, "delay": 2, "late": 2, "missing": 2, "slow": 2,
+        "wrong": 2, "problem": 2, "issue": 2, "waste": 2, "useless": 2,
+        "never": 2, "no help": 2, "still": 2, "again": 2, "contacted": 2,
+    }
+    mild_words = {  # weight 1 - mild complaint / neutral-negative
+        "refund": 1, "return": 1, "money back": 1, "charged": 1, "card": 1,
+        "declined": 1, "payment": 1, "login": 1, "password": 1, "locked": 1,
+        "account": 1, "unsubscribe": 1, "stop billing": 1,
+    }
+    # Genuine polite / appreciative words reduce intensity (calming signal).
+    calm_words = {  # weight -1
+        "please": -1, "thank": -1, "appreciate": -1, "thanks": -1,
+        "sorry": -1, "understand": -1, "help": -1,
+    }
 
-    if any(w in text_lower for w in high_frustration_words):
-        return "Furious", 9
+    # ---- compute a continuous intensity score ----
+    intensity = 0
+    for phrase, weight in severe_words.items():
+        if phrase in text_lower:
+            intensity += weight
+    for phrase, weight in strong_words.items():
+        if phrase in text_lower:
+            intensity += weight
+    for phrase, weight in mild_words.items():
+        if phrase in text_lower:
+            intensity += weight
+    for phrase, weight in calm_words.items():
+        if phrase in text_lower:
+            intensity += weight
 
-    if any(w in text_lower for w in [
-        "angry", "frustrated", "frustrating", "frustration",
-        "upset", "annoyed", "not happy", "not satisfied",
-    ]):
-        return "Angry", 7
+    # ---- map intensity to (emotion_label, frustration 1..10) ----
+    if intensity >= 12:
+        label, frustration = "Furious", 10
+    elif intensity >= 8:
+        label, frustration = "Angry", 8
+    elif intensity >= 5:
+        label, frustration = "Upset", 6
+    elif intensity >= 3:
+        label, frustration = "Frustrated", 4
+    else:
+        label, frustration = "Calm", 2
 
-    calm_words = ["please", "thank", "appreciate", "thanks"]
-    complaint_words = [
-        "refund", "not resolved", "still", "again", "no update",
-        "waiting", "delay", "late", "problem", "issue", "wrong",
-        "broken", "unhappy", "disappointed", "complaint",
-    ]
+    # Explicit supervisor / escalation / human-agent demand is the
+    # strongest possible signal regardless of word count.
+    escalation_demand = any(
+        w in text_lower for w in
+        ("supervisor", "manager", "escalate", "human agent", "real person",
+         "someone else", "speak to a", "talk to a", "higher department")
+    )
+    if escalation_demand:
+        label, frustration = "Furious", 10
 
-    if (
-        any(w in text_lower for w in calm_words)
-        and not any(w in text_lower for w in complaint_words)
-        and "not " not in text_lower
-    ):
-        return "Calm", 3
-
-    return "Frustrated", 5
+    return label, frustration
 
 
 # ==========================================================
@@ -104,6 +143,9 @@ NEGATIVE_WORDS = [
     "pathetic", "poor", "refund", "ridiculous", "sad", "slow", "still",
     "terrible", "twice", "unacceptable", "unhappy", "unresolved",
     "upset", "useless", "waiting", "waste", "worst", "wrong",
+    # Escalation / dissatisfaction demand signals (negative affect)
+    "supervisor", "manager", "escalate", "human agent", "real person",
+    "someone else", "demand", "speak to a", "talk to a",
 ]
 
 POSITIVE_WORDS = [
@@ -125,9 +167,16 @@ def detect_sentiment(text_lower: str) -> Dict:
     Returns:
         {
             "label": "positive" | "neutral" | "negative",
-            "score": float in [-1.0, 1.0],
-            "confidence": float in [0.0, 1.0],
+            "score": float in [-1.0, 1.0],   # polarity (positive - negative)
+            "confidence": float in [0.0, 1.0],  # certainty in the label
         }
+
+    Both `score` and `confidence` are DYNAMIC:
+    - `score` reflects the balance of positive vs negative words.
+    - `confidence` reflects how clear-cut the signal is: it rises with
+      the number of sentiment hits and with the magnitude of the
+      polarity, and is lowest when the message contains no sentiment
+      vocabulary at all.
     """
     words = re.findall(r"[a-z']+", text_lower)
 
@@ -151,23 +200,41 @@ def detect_sentiment(text_lower: str) -> Dict:
     total_hits = negative_hits + positive_hits
 
     if total_hits == 0:
+        # No sentiment vocabulary detected at all -> neutral, but
+        # confidence is LOW because we have no evidence either way.
         return {
             "label": "neutral",
             "score": 0.0,
-            "confidence": 0.4,
+            "confidence": 0.25,
         }
 
     raw_score = (positive_hits - negative_hits) / max(total_hits, 1)
+    raw_score = max(-1.0, min(1.0, raw_score))
 
-    if raw_score > 0.2:
+    # Label thresholds: only call it positive/negative when the
+    # polarity is meaningfully away from zero.
+    if raw_score > 0.15:
         label = "positive"
-    elif raw_score < -0.2:
+    elif raw_score < -0.15:
         label = "negative"
     else:
         label = "neutral"
 
+    # Confidence is dynamic: higher when (a) there is more evidence
+    # (more sentiment hits) and (b) the polarity is more decisive
+    # (further from zero). Lowest when the message is near-neutral
+    # despite having some sentiment words.
+    evidence_factor = min(1.0, total_hits / 8.0)          # 0..1, saturates at 8 hits
+    decisiveness = abs(raw_score)                          # 0..1
+    confidence = round(min(0.95, 0.35 + 0.4 * evidence_factor + 0.3 * decisiveness), 3)
+
+    # If we called it neutral despite having hits, lower confidence
+    # a touch because the signal is ambiguous.
+    if label == "neutral":
+        confidence = round(min(0.8, confidence - 0.05), 3)
+
     return {
         "label": label,
-        "score": round(max(-1.0, min(1.0, raw_score)), 3),
-        "confidence": round(min(1.0, 0.5 + 0.15 * total_hits), 3),
+        "score": round(raw_score, 3),
+        "confidence": confidence,
     }

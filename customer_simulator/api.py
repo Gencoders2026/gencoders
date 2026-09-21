@@ -402,9 +402,9 @@ def analyze(req: AnalyzeRequest):
     coaching = []
 
     if score >= 7:
-        coaching.append("Start by acknowledging the emotion: “I completely understand how frustrating this must be after 10 days.”")
+        coaching.append("Start by acknowledging the emotion: “I completely understand how frustrating this must be for you.”")
     
-    coaching.append("Give a clear next step + timeline (e.g. “I’m checking the tracking now and will have an update for you within 2 minutes.”)")
+    coaching.append("Give a clear next step + timeline (e.g. “I’m checking the tracking now and will have an update for you shortly.”)")
 
     if intent == "delayed_order":
         coaching.append("Proactively offer options: expedited reshipment, partial refund, or full refund.")
