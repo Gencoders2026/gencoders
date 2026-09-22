@@ -2,9 +2,13 @@
 Tests for Task 6: Coaching, Response Suggestion & Escalation Risk
 Monitoring.
 
-Run from the customer_simulator folder:
+Run from the task6_support_assist folder:
 
     python -m pytest test_support_assist.py -v
+
+or from the repository root:
+
+    python -m pytest task6_support_assist -v
 """
 
 import pytest
@@ -454,7 +458,7 @@ def test_customer_history_filters_agent_entries():
 # ==========================================================
 @pytest.fixture(scope="module")
 def client():
-    from api import app
+    from support_api import app
     return TestClient(app)
 
 

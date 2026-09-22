@@ -58,6 +58,15 @@ def detect_emotion(text_lower: str) -> Tuple[str, int]:
     negative/severe language the message contains, not a fixed
     point-by-point increase.
 
+    Bands (kept in sync with the Escalation Risk Monitor thresholds
+    and with the labels the UI expects):
+
+        Furious      9-10  fury vocabulary or an explicit supervisor /
+                           escalation / human-agent demand
+        Angry         7-8  clear anger vocabulary
+        Frustrated    5-6  mild complaint or negative request
+        Calm          3    no complaint signal (polite / neutral)
+
     IMPORTANT: this must ONLY be called with customer-written text,
     never with an agent/support reply. Agent politeness ("sorry",
     "please", "thank you") must not move the customer's emotion
@@ -91,32 +100,21 @@ def detect_emotion(text_lower: str) -> Tuple[str, int]:
         "sorry": -1, "understand": -1, "help": -1,
     }
 
-    # ---- compute a continuous intensity score ----
-    intensity = 0
-    for phrase, weight in severe_words.items():
-        if phrase in text_lower:
-            intensity += weight
-    for phrase, weight in strong_words.items():
-        if phrase in text_lower:
-            intensity += weight
-    for phrase, weight in mild_words.items():
-        if phrase in text_lower:
-            intensity += weight
-    for phrase, weight in calm_words.items():
-        if phrase in text_lower:
-            intensity += weight
+    # ---- dynamic, severity-weighted complaint intensity ----
+    severe_hits = [p for p in severe_words if p in text_lower]
+    strong_hits = [p for p in strong_words if p in text_lower]
+    mild_hits = [p for p in mild_words if p in text_lower]
+    calm_hits = [p for p in calm_words if p in text_lower]
 
-    # ---- map intensity to (emotion_label, frustration 1..10) ----
-    if intensity >= 12:
-        label, frustration = "Furious", 10
-    elif intensity >= 8:
-        label, frustration = "Angry", 8
-    elif intensity >= 5:
-        label, frustration = "Upset", 6
-    elif intensity >= 3:
-        label, frustration = "Frustrated", 4
-    else:
-        label, frustration = "Calm", 2
+    # The vocabulary weights (3 = fury, 2 = anger, 1 = complaint,
+    # -1 = calming) make the score scale with the message itself
+    # instead of a fixed point-by-point increase.
+    intensity = (
+        sum(severe_words[p] for p in severe_hits)
+        + sum(strong_words[p] for p in strong_hits)
+        + sum(mild_words[p] for p in mild_hits)
+        + sum(calm_words[p] for p in calm_hits)
+    )
 
     # Explicit supervisor / escalation / human-agent demand is the
     # strongest possible signal regardless of word count.
@@ -125,8 +123,24 @@ def detect_emotion(text_lower: str) -> Tuple[str, int]:
         ("supervisor", "manager", "escalate", "human agent", "real person",
          "someone else", "speak to a", "talk to a", "higher department")
     )
+
+    # ---- map to (emotion_label, frustration 1..10) ----
     if escalation_demand:
-        label, frustration = "Furious", 10
+        label, frustration = "Furious", 9
+    elif severe_hits:
+        # Fury vocabulary: 9, or the maximum 10 when the message piles
+        # up several fury signals and contains nothing calming.
+        label = "Furious"
+        if not calm_hits and (len(severe_hits) >= 3 or intensity >= 12):
+            frustration = 10
+        else:
+            frustration = 9
+    elif strong_hits:
+        label, frustration = "Angry", 8 if intensity >= 8 else 7
+    elif mild_hits:
+        label, frustration = "Frustrated", 6 if intensity >= 3 else 5
+    else:
+        label, frustration = "Calm", 3
 
     return label, frustration
 

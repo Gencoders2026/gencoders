@@ -129,15 +129,15 @@ RAG Knowledge Recommendation agent). It provides:
 ## Pipeline
 
 ```text
-Customer message
+Customer message (latest CUSTOMER message only)
     ↓
-Intent & Sentiment Analysis Agent   (analysis_core.py)
+Intent & Sentiment Analysis Agent   (task6_support_assist/analysis_core.py)
     ↓
-Knowledge Recommendation Agent      (knowledge_bridge.py → rag/ FAISS)
+Knowledge Recommendation Agent      (task6_support_assist/knowledge_bridge.py → rag/ FAISS)
     ↓
-Coaching & Response Suggestion Agent(support_assist.py)
+Coaching & Response Suggestion Agent(task6_support_assist/support_assist.py)
     ↓
-Escalation Risk Monitor Agent       (support_assist.py, session-aware)
+Escalation Risk Monitor Agent       (task6_support_assist/support_assist.py, session-aware)
     ↓
 Combined payload → Support Console UI
 ```
@@ -173,30 +173,50 @@ The React Support Console (`frontend/`, Vite + React Router) now shows:
 
 ## Running Task 6
 
+All Task 6 code lives in its own folder: **`task6_support_assist/`**
+(see `task6_support_assist/README.md` for details).
+
 ```bash
-# 1. Backend (FastAPI + support agents + RAG bridge)
+# 1. Backend - the customer simulator mounts the Task 6 router,
+#    so one server (port 8000) serves sessions AND support assistance.
 cd customer_simulator
 python -m uvicorn api:app --host 127.0.0.1 --port 8000
+#    Support Console UI : http://localhost:5173
+#    API docs           : http://127.0.0.1:8000/docs
+
+# 1b. Optional - run Task 6 completely on its own (port 8100)
+cd task6_support_assist
+python run.py
+#    Task 6 API docs    : http://127.0.0.1:8100/docs
 
 # 2. Frontend (Support Console)
 cd frontend
 npm install
 npm run dev          # http://localhost:5173
 
-# 3. Tests (25 checks: agents + API pipeline)
-cd customer_simulator
+# 3. Tests (37 checks: agents + API pipeline)
+cd task6_support_assist
 python -m pytest test_support_assist.py -v
+#    or from the repository root:
+python -m pytest task6_support_assist -v
 ```
 
 ### Files
 
 ```
-customer_simulator/
+task6_support_assist/
 ├── analysis_core.py          # Intent & Sentiment Analysis core
 ├── knowledge_bridge.py       # Knowledge Recommendation (RAG) bridge
 ├── support_assist.py         # Coaching agent + Escalation Risk Monitor
-├── api.py                    # FastAPI endpoints incl. /support/analyze
-└── test_support_assist.py    # 25 pytest checks
+├── support_api.py            # Task 6 FastAPI router + standalone app
+├── run.py                    # runs Task 6 standalone on port 8100
+├── conftest.py               # flat-import helper for pytest
+├── requirements.txt          # module dependencies
+├── README.md                 # Task 6 documentation
+└── test_support_assist.py    # 37 pytest checks
+
+customer_simulator/
+└── api.py                    # simulator endpoints + mounts the Task 6 router
 frontend/src/
 ├── services/supportAssistService.js
 └── pages/SupportConsole.jsx  # alert banner, suggestion card, monitor card

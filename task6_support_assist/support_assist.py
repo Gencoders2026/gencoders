@@ -108,31 +108,6 @@ class CoachingResponseAgent:
     and evaluates them for tone, clarity, empathy and professionalism.
     """
 
-    EMPATHY_OPENERS = {
-        "calm": (
-            "Thanks for reaching out — I'm happy to help you with "
-            "this right away."
-        ),
-        "neutral": (
-            "Thanks for getting in touch. Let me look into this "
-            "for you straight away."
-        ),
-        "frustrated": (
-            "I'm sorry for the inconvenience — I completely "
-            "understand how frustrating this is, and I'll sort it "
-            "out for you now."
-        ),
-        "negative": (
-            "I'm really sorry about this experience. You're right "
-            "to be upset, and I'm going to take care of this "
-            "personally right now."
-        ),
-        "positive": (
-            "Thank you for your patience — let me get this "
-            "wrapped up for you."
-        ),
-    }
-
     INTENT_NEXT_STEPS = {
         "refund_request": (
             "Would you like me to check the refund eligibility for your "
@@ -237,8 +212,11 @@ class CoachingResponseAgent:
         opener = self.EMPATHY_OPENERS.get(
             sentiment_key, self.EMPATHY_OPENERS["neutral"]
         )
-        action = self.INTENT_ACTIONS.get(
-            intent, self.INTENT_ACTIONS["general_inquiry"]
+        # Non-fabricating next step: the suggestion only offers to
+        # check / confirm something, it never claims an action that
+        # has not happened (see INTENT_NEXT_STEPS).
+        action = self.INTENT_NEXT_STEPS.get(
+            intent, self.INTENT_NEXT_STEPS["general_inquiry"]
         )
 
         knowledge_line, knowledge_used = self._build_knowledge_line(
