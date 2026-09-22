@@ -93,6 +93,11 @@ def detect_emotion(text_lower: str) -> Tuple[str, int]:
         "refund": 1, "return": 1, "money back": 1, "charged": 1, "card": 1,
         "declined": 1, "payment": 1, "login": 1, "password": 1, "locked": 1,
         "account": 1, "unsubscribe": 1, "stop billing": 1,
+        "delivery": 1, "delayed": 1, "order": 1,
+        "failed": 1, "failure": 1, "error": 1,
+        # Explicit unmet-demand signals mean the issue is still open.
+        "need": 1, "needs": 1, "needed": 1, "must": 1, "should": 1,
+        "long enough": 1,
     }
     # Genuine polite / appreciative words reduce intensity (calming signal).
     calm_words = {  # weight -1
@@ -154,12 +159,19 @@ NEGATIVE_WORDS = [
     "extremely", "fed up", "frustrated", "frustrating", "frustration",
     "furious", "horrible", "impossible", "late", "missing", "never",
     "no help", "nobody", "not happy", "not resolved", "not satisfied",
-    "pathetic", "poor", "refund", "ridiculous", "sad", "slow", "still",
+    "pathetic", "poor", "ridiculous", "sad", "slow", "still",
     "terrible", "twice", "unacceptable", "unhappy", "unresolved",
     "upset", "useless", "waiting", "waste", "worst", "wrong",
+    # Complaint nouns are negative even without an adjective: the
+    # customer would not mention them if nothing were wrong.
+    "refund", "failed", "failure", "error",
+    "delay", "delayed",
     # Escalation / dissatisfaction demand signals (negative affect)
     "supervisor", "manager", "escalate", "human agent", "real person",
     "someone else", "demand", "speak to a", "talk to a",
+    # Explicit unmet-demand signals: "I need this resolved", ...
+    "need", "needs", "needed", "must", "should", "long enough",
+    "immediately", "urgent", "urgently", "asap", "right now",
 ]
 
 POSITIVE_WORDS = [
@@ -197,8 +209,17 @@ def detect_sentiment(text_lower: str) -> Dict:
     negative_hits = 0
     positive_hits = 0
 
+    # Demand/urgency words that follow a positive verb ("resolved
+    # immediately", "fixed urgently") are an unmet DEMAND, not
+    # satisfaction — they must never flip the polarity to positive.
+    DEMAND_WORDS = frozenset([
+        "immediately", "urgent", "urgently", "asap", "now",
+        "right now", "long enough",
+    ])
+
     for index, word in enumerate(words):
         negated = index > 0 and words[index - 1] in NEGATIONS
+        demand_tail = index + 1 < len(words) and words[index + 1] in DEMAND_WORDS
 
         if word in NEGATIVE_WORDS:
             if negated:
@@ -206,7 +227,7 @@ def detect_sentiment(text_lower: str) -> Dict:
             else:
                 negative_hits += 1
         elif word in POSITIVE_WORDS:
-            if negated:
+            if negated or demand_tail:
                 negative_hits += 1
             else:
                 positive_hits += 1

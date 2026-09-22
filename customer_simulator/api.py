@@ -46,6 +46,8 @@ task6_router = None
 
 if TASK6_DIR.exists():
     if str(TASK6_DIR) not in sys.path:
+        # Position 0: the Task 6 modules must win over any same-named
+        # legacy module left in this folder (import precedence).
         sys.path.insert(0, str(TASK6_DIR))
 
     from support_api import router as task6_router  # noqa: E402
