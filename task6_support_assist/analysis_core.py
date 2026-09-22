@@ -23,6 +23,7 @@ INTENT_KEYWORDS = [
         "late", "delay", "delayed", "tracking",
         "not arrived", "hasn't arrived", "hasnt arrived",
         "where is my order", "still waiting",
+        "delivery", "waited",
     ]),
     ("payment_failure", [
         "payment", "charged", "declined", "card",

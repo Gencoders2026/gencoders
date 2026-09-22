@@ -80,13 +80,69 @@ def knowledge_status() -> Dict:
     }
 
 
+# ==========================================================
+# KNOWLEDGE RETRIEVAL — INTENT -> ALLOWED DOCUMENT MAP
+# ==========================================================
+# Maps each detected customer intent to the knowledge-base document
+# sources that are relevant to it. When ``search_knowledge`` is called
+# with an ``intent``, only chunks from the allowed sources for that
+# intent are returned, so the response suggestion, coaching guidance
+# and escalation analysis stay grounded in contextually relevant
+# information (e.g. delayed_order -> delivery/order docs, never
+# payment_issues.txt).
+#
+# Sources are matched against the ``source`` field in each chunk's
+# metadata (the filename the RAG chunker stored). A source is
+# considered relevant if its name contains any of the keywords listed
+# for the intent. ``general_inquiry`` has no restriction (all sources
+# are allowed) because no specific topic has been detected yet.
+
+_INTENT_SOURCE_KEYWORDS: Dict[str, List[str]] = {
+    "refund_request": [
+        "Refund", "Cancellation",
+    ],
+    # delayed_order: the knowledge base has no dedicated delivery/order
+    # document, so the closest RELEVANT policies are the Refund Policy
+    # (customers with undelivered orders often request refunds) and the
+    # Cancellation Policy (order cancellation). application_issues.txt
+    # is about app troubleshooting only and is NOT relevant here.
+    "delayed_order": [
+        "Refund", "Cancellation",
+    ],
+    "payment_failure": [
+        "payment_issues", "Refund",
+    ],
+    "account_issue": [
+        "login_issues",
+    ],
+    "cancellation": [
+        "Cancellation", "Refund",
+    ],
+    # general_inquiry: no restriction — caller can still filter later
+    # if it wants, but at detection time we do not know the topic yet.
+    "general_inquiry": [],
+}
+
+
+def _allowed_sources_for_intent(intent: str) -> List[str]:
+    """Return the intent-specific source keywords for ``intent``."""
+    return _INTENT_SOURCE_KEYWORDS.get(intent, [])
+
+
 def search_knowledge(
     query: str,
     top_k: int = 3,
     min_score: float = 0.0,
+    intent: Optional[str] = None,
 ) -> List[Dict]:
     """
     Retrieve the most relevant knowledge-base chunks for a query.
+
+    When ``intent`` is provided, only chunks whose source document is
+    relevant to that intent are returned, so the response suggestion,
+    coaching guidance and escalation analysis stay grounded in
+    contextually relevant information (e.g. ``delayed_order`` returns
+    delivery/order documents, never ``payment_issues.txt``).
 
     Returns a list of:
         {
@@ -105,8 +161,19 @@ def search_knowledge(
     if search_fn is None:
         return []
 
+    allowed_sources = _allowed_sources_for_intent(intent) \
+        if intent and intent != "general_inquiry" else []
+
+    # When intent-aware filtering is active we request more candidates
+    # from the retriever so that relevant documents which rank lower
+    # (e.g. Refund Policy.pdf for a delayed_order query) still have a
+    # chance to appear before the intent filter is applied.
+    retrieval_top_k = top_k
+    if allowed_sources:
+        retrieval_top_k = max(top_k, 20)
+
     try:
-        raw_results = search_fn(str(query).strip(), top_k=top_k)
+        raw_results = search_fn(str(query).strip(), top_k=retrieval_top_k)
     except Exception:  # pragma: no cover - depends on env
         return []
 
@@ -119,15 +186,25 @@ def search_knowledge(
             continue
 
         metadata = item.get("metadata") or {}
+        source = metadata.get("source") or "Knowledge Base"
+
+        # Intent-aware document filter: keep only chunks from sources
+        # relevant to the detected customer intent. When no intent or
+        # intent is general_inquiry, all sources are allowed.
+        if allowed_sources:
+            if not any(
+                kw.lower() in source.lower() for kw in allowed_sources
+            ):
+                continue
 
         results.append({
             "text": str(item.get("text", "")).strip(),
             "score": round(score, 4),
             "metadata": {
-                "source": metadata.get("source") or "Knowledge Base",
+                "source": source,
                 "page": metadata.get("page"),
                 "file_type": metadata.get("file_type"),
             },
         })
 
-    return results
+    return results[:top_k]

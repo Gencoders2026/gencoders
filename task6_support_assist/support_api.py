@@ -219,7 +219,7 @@ def analyze(req: AnalyzeRequest):
     # ------------------------------------------------------
     # KNOWLEDGE RECOMMENDATION AGENT (Task 6 integration)
     # ------------------------------------------------------
-    knowledge_results = search_knowledge(text, top_k=3)
+    knowledge_results = search_knowledge(text, top_k=3, intent=intent)
 
     # ------------------------------------------------------
     # COACHING & RESPONSE SUGGESTION AGENT (Task 6)
@@ -390,7 +390,7 @@ def support_analyze(req: SupportAssistRequest):
     # ------------------------------------------------------
     # 2. KNOWLEDGE RECOMMENDATION AGENT (RAG)
     # ------------------------------------------------------
-    knowledge_results = search_knowledge(text, top_k=3)
+    knowledge_results = search_knowledge(text, top_k=3, intent=intent)
 
     # ------------------------------------------------------
     # 4. ESCALATION RISK MONITOR AGENT
