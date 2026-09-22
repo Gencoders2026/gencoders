@@ -339,16 +339,27 @@ class CoachingResponseAgent:
 
             sentences = re.split(r"(?<=[.!?])\s+", text.strip())
             best_sentence = ""
+            keyword_sentence = ""
             for sentence in sentences:
                 sentence = sentence.strip()
                 if len(sentence) < 20:
                     continue
-                best_sentence = sentence
+                if not best_sentence:
+                    best_sentence = sentence
                 if keywords and any(
                     k in sentence.lower() for k in keywords
                 ):
+                    keyword_sentence = sentence
                     break
 
+            # Relevance guard: when the intent has specific keywords,
+            # ONLY use a sentence that actually matches them. Never
+            # quote an unrelated policy line (e.g. refund terms while
+            # the customer asked about a delayed delivery).
+            if keywords:
+                if not keyword_sentence:
+                    continue
+                best_sentence = keyword_sentence
             if not best_sentence:
                 continue
 
@@ -381,7 +392,7 @@ class CoachingResponseAgent:
             ),
             "delayed_order": (
                 "If the new delivery date doesn't work for you, would "
-                "you like a reshipment or a refund instead?"
+                "you like a reshipment of the same item instead?"
             ),
             "payment_failure": (
                 "Would you like to retry with the same card, or shall "
@@ -1157,6 +1168,9 @@ class EscalationRiskMonitor:
             # Last CUSTOMER-written text (used only to detect customer
             # repeats; agent text is never stored here).
             "last_customer_message": None,
+            # Analysis of the PREVIOUS customer message (for
+            # satisfaction-trend evidence comparison).
+            "previous_analysis": None,
         }
 
     def get_state(self, session_key: str) -> Dict:
@@ -1180,6 +1194,7 @@ class EscalationRiskMonitor:
             "assessments": list(state["assessments"]),
             "alerts": list(state["alerts"]),
             "current": state["last_result"],
+            "previous_analysis": state.get("previous_analysis"),
         }
 
     def assess_non_customer_message(
@@ -1449,28 +1464,24 @@ class EscalationRiskMonitor:
             })
             reasoning.append(f"{reason} (+{score_points}).")
 
-        # ---- Resolution progress (the only legal way DOWN) --------
-        # NEVER subtract because an agent reply was polite: only the
-        # customer's own confirmation of a fix, or an agent commitment
-        # the customer has not contradicted, eases the pressure.
-        easing = 0
+        # ---- Resolution progress ---------------------------------
+        # NO fixed per-turn easing (-30 / -12 removed): risk responds
+        # proportionally to the actual customer message + context.
+        # "resolved"/"offered" only SUPPRESS open-issue pressure
+        # indicators below; they never subtract a constant, and an
+        # agent reply alone can never lower the customer's score.
         if resolution["status"] == "resolved":
-            easing = -30
             reasoning.append(
                 "Customer confirmed the issue is resolved "
                 f"({', '.join(resolution['evidence']) or 'explicit confirmation'}) "
-                "(-30)."
+                "— open-issue pressure no longer applies."
             )
         elif resolution["status"] == "offered":
-            easing = -12
             reasoning.append(
                 "Agent gave a concrete commitment and the customer has "
-                "not contradicted it "
-                f"({', '.join(resolution['evidence'])}) (-12)."
+                f"not contradicted it ({', '.join(resolution['evidence'])})."
             )
-        if easing:
-            score += easing
-        resolved_eased = easing != 0
+        resolved_eased = resolution["status"] in ("resolved", "offered")
 
         # ---- Phrase-based indicators --------------------------
         for name, (points, phrases) in self.INDICATOR_PATTERNS.items():
@@ -1665,7 +1676,7 @@ class EscalationRiskMonitor:
         # The risk must not fall just because an agent reply was
         # polite: if the message reads as harsh/urgent as its context
         # and nothing was resolved, hold the line instead of easing.
-        if worsening and resolution["status"] in ("open", "unknown") and not easing:
+        if worsening and resolution["status"] in ("open", "unknown") and not resolved_eased:
             _add(
                 "tone_holding_or_worsening", 6,
                 "open issue, no resolution progress",
@@ -1733,6 +1744,10 @@ class EscalationRiskMonitor:
         state["intent_counts"][intent] = (
             state["intent_counts"].get(intent, 0) + 1
         )
+        # Capture the PREVIOUS customer analysis (before overwrite)
+        # so the API can derive a satisfaction trend from actual
+        # customer evidence, not from a fixed per-turn step.
+        state["previous_analysis"] = state.get("last_analysis")
         state["last_analysis"] = {
             "intent": intent,
             "emotion": emotion_label,
@@ -1785,6 +1800,7 @@ class EscalationRiskMonitor:
             "assessed_at": assessment["assessed_at"],
             "customer_message": message,
             "analyzed_customer_message": True,
+            "resolution_status": resolution["status"],
         }
 
         state["last_signature"] = signature

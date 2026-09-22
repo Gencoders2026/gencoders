@@ -209,7 +209,11 @@ def analyze(req: AnalyzeRequest):
     coaching.append("Give a clear next step + timeline (e.g. \u201cI am checking the tracking now and will have an update for you shortly.\u201d)")
 
     if intent == "delayed_order":
-        coaching.append("Proactively offer options: expedited reshipment, partial refund, or full refund.")
+        coaching.append(
+            "Proactively offer delivery-focused options: expedited "
+            "reshipment or an updated delivery date. Only mention "
+            "refunds if the customer actually asks about one."
+        )
         coaching.append("Share the tracking number and expected delivery date if available.")
     elif intent == "refund_request":
         coaching.append("Confirm refund eligibility and exact processing time (e.g. 3-5 business days).")
@@ -324,6 +328,47 @@ def _session_key(session_id: Optional[str], query: str) -> str:
         query.lower()[:160].encode("utf-8")
     ).hexdigest()[:12]
     return f"adhoc-{digest}"
+
+
+def _satisfaction_trend_from_evidence(
+    sentiment_label: str,
+    frustration: int,
+    resolution_status: str,
+    previous: Optional[Dict],
+) -> str:
+    """
+    Satisfaction trend derived ONLY from the customer's actual
+    message + context — never from a fixed per-turn change and never
+    from agent politeness.
+
+    "improving" requires positive customer sentiment or the customer's
+    own confirmation that the issue is resolved (or a clear drop in
+    the customer's own frustration versus their previous message).
+    A negative/urgent message like "I have waited long enough. I need
+    this delivery issue resolved immediately." stays declining or
+    steady — never improving.
+    """
+    if previous is None:
+        return "unknown"
+
+    customer_confirmed = resolution_status == "resolved"
+    prev_frustration = previous.get("frustration")
+    try:
+        prev_frustration = int(prev_frustration) if prev_frustration is not None else None
+    except (TypeError, ValueError):
+        prev_frustration = None
+
+    frustration_evidence = (
+        prev_frustration is not None
+        and frustration < prev_frustration
+        and sentiment_label != "negative"
+    )
+
+    if customer_confirmed or sentiment_label == "positive" or frustration_evidence:
+        return "improving"
+    if sentiment_label == "negative" or frustration >= 6:
+        return "declining"
+    return "steady"
 
 
 SATISFACTION_TREND_MAP = {
@@ -485,8 +530,11 @@ def _build_support_assist_response(
         "sentiment": sentiment["label"],
         "sentiment_score": sentiment["score"],
         "confidence": sentiment["confidence"],
-        "satisfaction_trend": SATISFACTION_TREND_MAP.get(
-            risk["trend"], "unknown"
+        "satisfaction_trend": _satisfaction_trend_from_evidence(
+            sentiment["label"],
+            frustration,
+            risk.get("resolution_status", "unknown"),
+            monitor_state.get("previous_analysis"),
         ),
 
         # ---- Escalation Risk Monitor Agent ----
