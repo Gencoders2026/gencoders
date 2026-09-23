@@ -647,8 +647,9 @@ class CoachingResponseAgent:
 
         if intent == "delayed_order":
             tips.append(
-                "Proactively offer options: expedited reshipment, "
-                "partial refund, or full refund."
+                "Proactively offer delivery-focused options: expedited "
+                "shipping, a reshipment, or a confirmed new delivery "
+                "date. Stay on the delivery topic the customer raised."
             )
             tips.append(
                 "Share the tracking number and expected delivery date "

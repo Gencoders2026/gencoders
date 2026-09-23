@@ -129,6 +129,90 @@ def _allowed_sources_for_intent(intent: str) -> List[str]:
     return _INTENT_SOURCE_KEYWORDS.get(intent, [])
 
 
+# ==========================================================
+# KNOWLEDGE RETRIEVAL — INTENT -> CHUNK CONTENT FILTER
+# ==========================================================
+# Source filtering alone is not enough: e.g. a chunk from
+# Refund Policy.pdf that explains how to PROCESS a refund is
+# irrelevant to a customer whose issue is a delayed delivery.
+# Every returned chunk must ALSO contain vocabulary that belongs
+# to the detected intent's topic, so the suggested response,
+# coaching tips and escalation analysis can only quote passages
+# about the customer's actual issue.
+#
+# Rules:
+# - ``general_inquiry`` has no content filter (topic unknown yet).
+# - The customer's own words can widen retrieval: if the message
+#   itself explicitly asks about a refund/payment while the intent
+#   is another topic (e.g. delayed_order + "or I want my money
+#   back"), the refund/payment content words are additionally
+#   allowed — the customer IS asking about it.
+# - If no chunk passes the filter, an empty list is returned;
+#   quoting an unrelated policy would be worse than quoting none.
+
+_INTENT_CONTENT_KEYWORDS: Dict[str, List[str]] = {
+    "refund_request": [
+        "refund", "money back", "reimburs", "chargeback",
+        "return", "credited",
+    ],
+    # Delivery / order-delay vocabulary only — every word must be
+    # unmistakably about fulfilment/logistics. Deliberately does NOT
+    # include bare "order", "wait", "late" or "delayed" (those appear
+    # in refund/payment passages too) and no refund/payment words —
+    # those must not be quoted unless the customer asks about them.
+    "delayed_order": [
+        "deliver", "shipment", "shipping", "tracking", "courier",
+        "carrier", "dispatch", "parcel", "backorder",
+        "delivery date", "estimated delivery", "delivery estimate",
+        "dispatched", "in transit", "transit", "arrive", "arrival",
+        "order status", "shipping status",
+    ],
+    "payment_failure": [
+        "payment", "paid", "charge", "charged", "card", "billing",
+        "transaction", "declined", "pay", "checkout", "upi",
+        "invoice",
+    ],
+    "account_issue": [
+        "account", "login", "log in", "sign in", "password",
+        "username", "locked", "credential", "verification",
+        "two-factor", "reset",
+    ],
+    "cancellation": [
+        "cancel", "cancellation", "terminate", "subscription",
+    ],
+    # Topic unknown: no content restriction.
+    "general_inquiry": [],
+}
+
+# When the customer's message itself raises one of these topics,
+# its content words are allowed for ANY intent (the customer is
+# explicitly asking about it).
+_MESSAGE_WIDENING_TOPICS: Dict[str, List[str]] = {
+    "refund": _INTENT_CONTENT_KEYWORDS["refund_request"],
+    "payment": _INTENT_CONTENT_KEYWORDS["payment_failure"],
+}
+
+_MESSAGE_WIDENING_TRIGGERS: Dict[str, List[str]] = {
+    "refund": ["refund", "money back", "reimburs", "chargeback"],
+    "payment": [
+        "payment", "charged", "charge", "card", "billing",
+        "transaction", "declined", "pay",
+    ],
+}
+
+
+def _content_keywords_for(intent: str, query: str) -> List[str]:
+    """Content words a chunk must contain for this intent/query."""
+    keywords = list(_INTENT_CONTENT_KEYWORDS.get(intent, []))
+    query_lower = (query or "").lower()
+    for topic, triggers in _MESSAGE_WIDENING_TRIGGERS.items():
+        if any(t in query_lower for t in triggers):
+            for word in _MESSAGE_WIDENING_TOPICS[topic]:
+                if word not in keywords:
+                    keywords.append(word)
+    return keywords
+
+
 def search_knowledge(
     query: str,
     top_k: int = 3,
@@ -163,6 +247,9 @@ def search_knowledge(
 
     allowed_sources = _allowed_sources_for_intent(intent) \
         if intent and intent != "general_inquiry" else []
+    content_keywords = _content_keywords_for(
+        intent or "general_inquiry", query
+    )
 
     # When intent-aware filtering is active we request more candidates
     # from the retriever so that relevant documents which rank lower
@@ -197,8 +284,18 @@ def search_knowledge(
             ):
                 continue
 
+        # Intent content filter: the chunk TEXT must discuss the
+        # detected intent's topic (e.g. delivery/tracking words for
+        # delayed_order), so refund/payment passages are never quoted
+        # for a delivery issue — and vice versa.
+        chunk_text = str(item.get("text", ""))
+        chunk_lower = chunk_text.lower()
+        if content_keywords:
+            if not any(kw in chunk_lower for kw in content_keywords):
+                continue
+
         results.append({
-            "text": str(item.get("text", "")).strip(),
+            "text": chunk_text.strip(),
             "score": round(score, 4),
             "metadata": {
                 "source": source,
