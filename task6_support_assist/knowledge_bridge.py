@@ -141,7 +141,9 @@ def _allowed_sources_for_intent(intent: str) -> List[str]:
 # about the customer's actual issue.
 #
 # Rules:
-# - ``general_inquiry`` has no content filter (topic unknown yet).
+# - ``general_inquiry`` derives its vocabulary from the customer's
+#   OWN message (topic unknown until the customer reveals it); if the
+#   message carries no topic words, no knowledge is returned at all.
 # - The customer's own words can widen retrieval: if the message
 #   itself explicitly asks about a refund/payment while the intent
 #   is another topic (e.g. delayed_order + "or I want my money
@@ -210,6 +212,23 @@ def _content_keywords_for(intent: str, query: str) -> List[str]:
             for word in _MESSAGE_WIDENING_TOPICS[topic]:
                 if word not in keywords:
                     keywords.append(word)
+    if not keywords:
+        # general_inquiry / unknown intent: derive the topic from the
+        # customer's own words. If the message carries no topic
+        # vocabulary, nothing is allowed (see search_knowledge) so an
+        # unrelated policy is never quoted.
+        intent_words = set(_INTENT_CONTENT_KEYWORDS.get(intent, []))
+        _ = intent_words  # clarity: intent had no vocabulary at all
+        keywords = [
+            kw for kw in sorted(
+                {
+                    word
+                    for words in _INTENT_CONTENT_KEYWORDS.values()
+                    for word in words
+                }
+            )
+            if kw in query_lower
+        ]
     return keywords
 
 
@@ -248,8 +267,16 @@ def search_knowledge(
     allowed_sources = _allowed_sources_for_intent(intent) \
         if intent and intent != "general_inquiry" else []
     content_keywords = _content_keywords_for(
-        intent or "general_inquiry", query
+        intent or "", query
     )
+    # general_inquiry / no intent: topic is only known from the
+    # customer's own words. If the message carries no topic vocabulary
+    # (e.g. a plain "thank you"), retrieve NOTHING — quoting an
+    # unrelated policy (payment/refund) would be worse than quoting
+    # none. This keeps knowledge contextually relevant globally, not
+    # just for one scenario.
+    if not content_keywords and (not intent or intent == "general_inquiry"):
+        return []
 
     # When intent-aware filtering is active we request more candidates
     # from the retriever so that relevant documents which rank lower
