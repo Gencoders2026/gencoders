@@ -20,6 +20,12 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+# Make sibling modules (simulator, personas, scenarios, ...) importable
+# regardless of how uvicorn is launched (e.g. `uvicorn customer_simulator.api`).
+_BASE_DIR = Path(__file__).resolve().parent
+if str(_BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(_BASE_DIR))
+
 from simulator import (
     CustomerSimulator,
     create_simulator,
