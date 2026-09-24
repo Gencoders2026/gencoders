@@ -28,3 +28,7 @@ uvicorn_err.log
 vite_out.log
 pytest_out*.txt
 .pytest_cache/
+smoke_*.log
+uv[0-9]*_*.log
+_t6pytest_run.txt
+t6_final_pytest.txt
