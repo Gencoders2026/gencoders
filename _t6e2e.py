@@ -2,7 +2,9 @@
 B = 'http://127.0.0.1:8000'
 def post(payload):
     req = urllib.request.Request(B + '/support/analyze', data=json.dumps(payload).encode(), headers={'Content-Type':'application/json'}, method='POST')
-    with urllib.request.urlopen(req, timeout=15) as r:
+    # Generous timeout: the first request after a server restart loads the
+    # embedding model / knowledge index and can take a while.
+    with urllib.request.urlopen(req, timeout=120) as r:
         return json.load(r)
 def fmt(d):
     return f"emotion={d.get('emotion'):<10} frust={d.get('frustration_level')}/10 risk={d.get('escalation_score'):>3} {d.get('escalation_level'):<8} trend={d.get('escalation_trend','?'):<13} sat={d.get('satisfaction_trend','?')}"
