@@ -24,7 +24,7 @@ task6_support_assist/
 ├── support_assist.py        # Coaching & Escalation Risk agents
 ├── support_api.py           # FastAPI router + standalone app
 ├── run.py                   # Runs the Task 6 API on its own (port 8100)
-├── test_support_assist.py   # 37 pytest checks (agents + API pipeline)
+├── test_support_assist.py   # 51 pytest checks (agents + API pipeline)
 ├── conftest.py              # makes the flat imports work from any cwd
 ├── requirements.txt         # dependencies of this module
 └── README.md
@@ -70,6 +70,23 @@ Support Console or via `POST /escalation/threshold`.
 Frustration bands returned by the analysis (kept in sync with the
 escalation thresholds and the UI labels): Furious 9–10 · Angry 7–8 ·
 Frustrated 5–6 · Calm 3.
+
+### How the risk score moves
+
+`EscalationRiskMonitor` recomputes the score from the latest **customer**
+message plus the customer-only conversation context on every reply
+(`assess_non_customer_message()` ignores agent messages entirely):
+
+* repeat pressure grows with every raising of the same issue
+  (`18` → `24` → `26` → `28` → `30` for complaint wording, `6 / 9 / 12
+  / …` capped at `20` for a repeat without complaint wording), so a long
+  unresolved conversation never freezes on one value;
+* an increase is applied immediately and `escalation_trend` reports any
+  change above ±1 point as `increasing` / `decreasing`;
+* a decrease is only applied when the customer's own words show genuine
+  de-escalation or a confirmed resolution — milder phrasing alone keeps
+  the pressure level (`test_neutral_message_does_not_change_frustration`,
+  `test_resolved_confirmation_releases_state_and_risk`).
 
 ## Running
 

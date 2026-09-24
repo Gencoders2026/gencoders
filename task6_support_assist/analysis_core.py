@@ -221,6 +221,35 @@ NEGATIVE_WORDS = [
     # Explicit unmet-demand signals: "I need this resolved", ...
     "need", "needs", "needed", "must", "should", "long enough",
     "immediately", "urgent", "urgently", "asap", "right now",
+    # Worry / eroding patience: a customer who is "concerned" or
+    # "beginning to lose patience" about an unresolved issue is NOT
+    # neutral - they are voicing a negative affect that must keep the
+    # escalation monitor's negative-sentiment streak alive.
+    "concerned", "concerning", "worrying", "worried", "impatient",
+    "unhelpful", "dissatisfied",
+]
+
+# Multi-word negative expressions.
+#
+# The token loop in `detect_sentiment` can only see single words
+# (`re.findall(r"[a-z']+")` drops the spaces), so every multi-word entry
+# of NEGATIVE_WORDS *and* the expressions below are matched against the
+# raw message. Without this, "I'm beginning to lose patience" or
+# "still no update" scored as NEUTRAL, which reset the escalation
+# monitor's negative streak while the customer was still escalating.
+NEGATIVE_PHRASES = [
+    # multi-word entries that already exist in NEGATIVE_WORDS
+    "fed up", "no help", "not happy", "not resolved", "not satisfied",
+    "human agent", "real person", "someone else",
+    "speak to a", "talk to a", "long enough", "money back",
+    # eroding patience / continued silence
+    "lose patience", "losing patience", "losing my patience",
+    "no update", "no updates", "no progress", "no response", "no reply",
+    "keeps happening", "same issue", "same problem", "no solution",
+    "nothing happened", "waste of time",
+    # unresolved pressure
+    "still waiting", "still no", "still not", "still nothing",
+    "not helpful", "not good", "not acceptable",
 ]
 
 POSITIVE_WORDS = [
@@ -252,6 +281,13 @@ def detect_sentiment(text_lower: str) -> Dict:
       the number of sentiment hits and with the magnitude of the
       polarity, and is lowest when the message contains no sentiment
       vocabulary at all.
+
+    Multi-word negatives ("no update", "losing patience", "not
+    helpful", ...) are matched against the raw message as well, because
+    the word loop below can never see a phrase. A repeat complaint that
+    is politely worded (still unresolved, but "I'd appreciate an
+    update") therefore stays NEGATIVE - it must not reset the
+    escalation monitor's negative-sentiment streak.
     """
     words = re.findall(r"[a-z']+", text_lower)
 
@@ -280,6 +316,12 @@ def detect_sentiment(text_lower: str) -> Dict:
                 negative_hits += 1
             else:
                 positive_hits += 1
+
+    # Multi-word negatives are checked against the raw text (the loop
+    # above only ever sees single tokens). Each expression counts once.
+    negative_hits += sum(
+        1 for phrase in NEGATIVE_PHRASES if phrase in text_lower
+    )
 
     total_hits = negative_hits + positive_hits
 

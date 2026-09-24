@@ -158,6 +158,27 @@ Risk levels: **Low** 0–24 · **Medium** 25–49 · **High** 50–74 ·
 `ESCALATION_ALERT_THRESHOLD`) and can be changed at runtime from the UI
 or via `POST /escalation/threshold`.
 
+## Escalation risk dynamics
+
+The score is **recalculated from the latest customer message plus the
+customer-only conversation context after every reply**, so it keeps
+moving while a conversation stays unresolved:
+
+* **Repeat pressure grows with every raising of the same issue** — the
+  same complaint is worth `18` points on first use, `24` on the second
+  mention, then `26 / 28 / 30` (capped); a repeated mention that is not
+  phrased as a complaint is worth `6 / 9 / 12 / …` (capped at `20`).
+* **A rise is applied immediately** (`score > previous`), and any real
+  change is reported in `escalation_trend` as `increasing` /
+  `decreasing` (only a ±1-point difference is treated as `stable`).
+* **A drop requires evidence in the customer's own words** — genuine
+  de-escalation or a confirmed resolution (`okay, I understand`,
+  `that's resolved`) lowers the score; a milder phrasing alone does not,
+  so risk can never fall just because the agent replied politely.
+* Agent messages never enter this calculation
+  (`assess_non_customer_message()` is a pure no-op handoff), so nothing
+  here is driven by the turn number.
+
 ## Frontend
 
 The React Support Console (`frontend/`, Vite + React Router) now shows:
@@ -194,7 +215,7 @@ cd frontend
 npm install
 npm run dev          # http://localhost:5173
 
-# 3. Tests (37 checks: agents + API pipeline)
+# 3. Tests (51 checks: agents + API pipeline)
 cd task6_support_assist
 python -m pytest test_support_assist.py -v
 #    or from the repository root:
@@ -213,7 +234,7 @@ task6_support_assist/
 ├── conftest.py               # flat-import helper for pytest
 ├── requirements.txt          # module dependencies
 ├── README.md                 # Task 6 documentation
-└── test_support_assist.py    # 37 pytest checks
+└── test_support_assist.py    # 51 pytest checks
 
 customer_simulator/
 └── api.py                    # simulator endpoints + mounts the Task 6 router

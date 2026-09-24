@@ -22,6 +22,8 @@ import analysis_core as ac
 from support_assist import (
     CoachingResponseAgent,
     EscalationRiskMonitor,
+    raised_before_points,
+    repeated_complaint_points,
     risk_level_for_score,
 )
 
@@ -878,3 +880,145 @@ def test_state_follows_message_content_not_turn_number(monitor):
     assert late[-1]["escalation_score"] > late[0]["escalation_score"]
     assert late[-1]["trend"] == "increasing"
     assert late[-1]["satisfaction_trend"] == "declining"
+
+
+# ==========================================================
+# Task 6 correction - the Escalation Risk Monitor must MOVE with every
+# customer reply. A conversation that keeps repeating the SAME
+# unresolved issue must keep adding pressure (never freeze at one
+# value), a politely worded repeat stays NEGATIVE, and the pressure
+# streak is not erased while nothing has actually been fixed.
+# ==========================================================
+_AGENT_ACK = (
+    "I am so sorry about this. I am checking the current delivery "
+    "status of your order right now and will give you a concrete "
+    "update as soon as I have it."
+)
+
+_SUSTAINED_REPEATS = [
+    "This delivery delay is unacceptable. I need a definite delivery "
+    "date now.",
+    "I'm tired of waiting without a clear update. Please give me a "
+    "definite delivery expectation.",
+    "Please provide a proper timeline for the delivery. Waiting "
+    "without updates is not helpful.",
+    "I'm concerned about the delivery delay. Can you give me a clear "
+    "update?",
+    "I'm beginning to lose patience. I'd appreciate it if you could "
+    "look into the current status of my delayed order.",
+]
+
+
+def test_repeat_pressure_grows_with_every_mention():
+    # Strong complaint without a repeat yet.
+    assert repeated_complaint_points(1) == 18
+    # 2nd raising keeps its original weight ...
+    assert repeated_complaint_points(2) == 24
+    # ... and every further raising of the SAME open issue adds more.
+    assert repeated_complaint_points(3) == 26
+    assert repeated_complaint_points(4) == 28
+    assert repeated_complaint_points(5) == 30
+    # Capped, so a very long conversation cannot run away.
+    assert repeated_complaint_points(50) == 30
+
+    # The same issue raised again without complaint wording also grows.
+    assert raised_before_points(3) == 6
+    assert raised_before_points(4) == 9
+    assert raised_before_points(5) == 12
+    assert raised_before_points(6) == 15
+    assert raised_before_points(50) == 20
+
+
+def test_polite_repeat_complaint_is_still_negative():
+    # These are the exact wordings a frustrated/delayed-order session
+    # produced in the Support Console. They must never be reported as
+    # "neutral", which used to reset the negative-sentiment streak and
+    # froze the risk score.
+    for message in (
+        "I'm beginning to lose patience. I'd appreciate it if you could "
+        "look into the current status of my delayed order.",
+        "I'm starting to get concerned. Could you check my delivery?",
+        "This is becoming worrying. Could you please check the delivery "
+        "status and give me an update?",
+        "I'm concerned about the delivery delay. Can you give me a clear "
+        "update?",
+        "There is still no update on my delayed order, this is not "
+        "helpful.",
+    ):
+        result = ac.detect_sentiment(message.lower())
+        assert result["label"] == "negative", message
+        assert result["score"] < 0
+
+
+def test_risk_keeps_moving_with_every_unresolved_reply(monitor):
+    turns = [(None, _SUSTAINED_REPEATS[0])] + [
+        (_AGENT_ACK, message) for message in _SUSTAINED_REPEATS[1:]
+    ]
+    results = _conversation(monitor, "s-sustained", turns)
+    scores = [result["escalation_score"] for result in results]
+
+    # Every reply moves the score and the direction is up while the
+    # issue stays unresolved ...
+    assert all(later > earlier for earlier, later in zip(scores, scores[1:]))
+    # ... and the trend the UI displays agrees with that direction.
+    assert all(result["trend"] == "increasing" for result in results[1:])
+    assert all(
+        result["satisfaction_trend"] == "declining"
+        for result in results[1:]
+    )
+    # The repeated raising is visible in the reasoning.
+    assert any("raised" in line for line in results[-1]["reasoning"])
+    # The sentiment never silently flips to neutral while the customer
+    # keeps repeating an unresolved complaint.
+    assert all(result["sentiment_label"] == "negative" for result in results)
+    assert results[-1]["negative_streak"] == len(results)
+    assert results[-1]["escalation_level"] in ("Medium", "High", "Critical")
+
+
+def test_neutral_repeat_of_open_issue_keeps_pressure_streak(monitor):
+    results = _conversation(monitor, "s-streak-hold", [
+        (None, "This is unacceptable, my delivery is late!"),
+        (_AGENT_ACK, "Delivery still not here, this is awful!"),
+        (_AGENT_ACK, "When will the delivery happen?"),
+    ])
+    assert results[0]["negative_streak"] == 1
+    assert results[1]["negative_streak"] == 2
+    # Message 3 carries no negative wording, but nothing was fixed: the
+    # pressure streak is HELD instead of erased, so the risk cannot
+    # silently drop back to a "fresh" conversation.
+    assert results[2]["sentiment_label"] == "neutral"
+    assert results[2]["negative_streak"] == 2
+    assert results[2]["escalation_score"] >= results[1]["escalation_score"]
+
+
+def test_support_analyze_risk_moves_on_every_reply(client):
+    """API-level guard for the Support Console flow (one call per reply)."""
+    session_id = "api-sustained-risk"
+    history = []
+    scores = []
+    trends = []
+
+    for turn, message in enumerate(_SUSTAINED_REPEATS, 1):
+        history.append({"role": "customer", "content": message})
+
+        data = client.post(
+            "/support/analyze",
+            json={
+                "query": message,
+                "session_id": session_id,
+                "turn": turn,
+                "history": list(history),
+            },
+        ).json()
+
+        scores.append(data["escalation_score"])
+        trends.append(data["escalation_trend"])
+        assert data["sentiment"] == "negative"
+
+        history.append({"role": "agent", "content": _AGENT_ACK})
+
+    assert scores == sorted(scores)
+    assert len(set(scores)) == len(scores)
+    assert scores[-1] > scores[0]
+    assert trends[0] == "first_message"
+    assert all(trend == "increasing" for trend in trends[1:])

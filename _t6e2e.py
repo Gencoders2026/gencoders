@@ -5,7 +5,7 @@ def post(payload):
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.load(r)
 def fmt(d):
-    return f"emotion={d.get('emotion'):<10} frust={d.get('frustration')}/10 risk={d.get('escalation_score'):>3} {d.get('escalation_level'):<8} trend={d.get('risk_trend', d.get('trend','?')):<13} sat={d.get('satisfaction_trend','?')}"
+    return f"emotion={d.get('emotion'):<10} frust={d.get('frustration_level')}/10 risk={d.get('escalation_score'):>3} {d.get('escalation_level'):<8} trend={d.get('escalation_trend','?'):<13} sat={d.get('satisfaction_trend','?')}"
 # Same session: angry -> mild -> neutral -> calm -> resolved -> angry again (content-driven, not turn-driven)
 sid = 'e2e-' + str(random.randint(1000,9999))
 turns = [

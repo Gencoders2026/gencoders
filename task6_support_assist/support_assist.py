@@ -77,10 +77,21 @@ _NEGATIVE_STREAK_WORDS = frozenset([
     "slow", "still",
     "terrible", "twice", "unacceptable", "unhappy", "unresolved",
     "upset", "useless", "waiting", "waste", "worst", "wrong",
+    # Eroding patience / worry: keeps a streak alive for a politely
+    # worded repeat complaint ("I'm starting to get concerned").
+    "concerned", "concerning", "worrying", "worried", "impatient",
+    "unhelpful", "dissatisfied",
 ])
+# Multi-word negatives must also count in the streak check, where
+# `re.findall(r"[a-z']+")` drops spaces.
 _NEGATIVE_STREAK_PHRASES = frozenset([
     "fed up", "no help", "not happy", "not resolved", "not satisfied",
     "long enough",
+    "lose patience", "losing patience", "losing my patience",
+    "no update", "no progress", "no response", "no reply",
+    "keeps happening", "same issue", "same problem", "no solution",
+    "nothing happened", "not helpful", "waste of time",
+    "still waiting", "still no", "still not", "still nothing",
 ])
 _POSITIVE_STREAK_WORDS = frozenset([
     "appreciate", "awesome", "excellent", "fast", "good", "great",
@@ -129,11 +140,10 @@ _AGENT_POLITENESS_WORDS = frozenset([
     "kindly", "of course", "great question", "wonderful",
 ])
 
-# Multi-word negatives must also count in the streak check, where
-# `re.findall(r"[a-z']+")` drops spaces.
-_NEGATIVE_STREAK_PHRASES = frozenset([
-    "fed up", "no help", "not happy", "not resolved", "not satisfied",
-])
+# NOTE: multi-word negatives are covered by the single
+# `_NEGATIVE_STREAK_PHRASES` definition next to the streak vocabulary
+# above - `re.findall(r"[a-z']+")` drops spaces, so phrases are matched
+# against the raw text there.
 
 
 # ==========================================================
@@ -237,6 +247,60 @@ def risk_level_for_score(score: int) -> str:
         if score >= minimum:
             return level
     return "Low"
+
+
+# ==========================================================
+# REPEAT-PRESSURE CURVE (single source of truth)
+# ==========================================================
+# How much a repeated complaint is worth depends on HOW MANY CUSTOMER
+# MESSAGES raised the same issue, so the escalation risk keeps moving
+# as long as the conversation is not resolved instead of saturating
+# after the first repeat:
+#
+#   mentions 1            -> 18  (strong complaint, no repeat yet)
+#   mentions 2            -> 24
+#   mentions 3, 4, 5, ... -> 26, 28, 30 (capped)
+#
+# Nothing here is a per-turn increment: `mentions` always comes from
+# the conversation itself (customer history + the monitor's counters),
+# never from the turn number.
+_REPEAT_MENTION_BASE_POINTS = 18
+_REPEAT_POINTS_START = 24
+_REPEAT_POINTS_STEP = 2
+_REPEAT_POINTS_CAP = 30
+
+# A repeat that is not phrased as a complaint (no complaint wording, but
+# the same issue for the 3rd+ time) also grows: 6, 9, 12, ... (capped).
+_RAISED_BEFORE_POINTS = 6
+_RAISED_BEFORE_STEP = 3
+_RAISED_BEFORE_CAP = 20
+
+
+def repeated_complaint_points(mentions: int) -> int:
+    """Repeat-pressure points for a complaint raised `mentions` times."""
+    try:
+        mentions = int(mentions)
+    except (TypeError, ValueError):
+        mentions = 1
+    if mentions < 2:
+        return _REPEAT_MENTION_BASE_POINTS
+    return min(
+        _REPEAT_POINTS_CAP,
+        _REPEAT_POINTS_START + _REPEAT_POINTS_STEP * (mentions - 2),
+    )
+
+
+def raised_before_points(mentions: int) -> int:
+    """Repeat-pressure points for the Nth raising of the same issue."""
+    try:
+        mentions = int(mentions)
+    except (TypeError, ValueError):
+        mentions = 3
+    mentions = max(3, mentions)
+    return min(
+        _RAISED_BEFORE_CAP,
+        _RAISED_BEFORE_POINTS + _RAISED_BEFORE_STEP * (mentions - 3),
+    )
 
 
 # ==========================================================
@@ -810,11 +874,20 @@ class EscalationRiskMonitor:
         unresolved_issue        +16
         cancellation_threat     +10
         urgency_pressure         +8
-        repeated complaints   +12..24
+        repeated complaints   +18..30  (grows with EVERY repeat of the
+                                       same unresolved issue)
+        same issue raised again,
+        without complaint wording  +6..20 (grows with every repeat)
         high frustration       +5..18
         negative sentiment
         streak (>=2 messages) +10..15
         explicit demand + unresolved compound   +10
+
+    Every component is a pure function of the latest CUSTOMER message
+    plus the customer-only conversation context, so the score is
+    recalculated (and therefore changes) after every customer reply:
+    it rises while the same unresolved issue keeps being raised and
+    falls only when the customer's own words show genuine improvement.
 
     Levels:  Low <25 | Medium 25-49 | High 50-74 | Critical >=75
     """
@@ -1756,7 +1829,11 @@ class EscalationRiskMonitor:
         - explicit indicators found in the latest customer message,
         - frustration read from the latest customer message,
         - negative-sentiment streak over CUSTOMER messages,
-        - repeat/repeat-complaint signals over CUSTOMER messages.
+        - repeat/repeat-complaint signals over CUSTOMER messages, where
+          the pressure GROWS with every additional raising of the same
+          unresolved issue (the 4th raising is worth more than the 3rd)
+          so an unresolved conversation keeps moving the score instead
+          of freezing at a fixed value.
 
         Idempotent: re-assessing the exact same message and turn
         returns the previous result without double counting.
@@ -1915,6 +1992,19 @@ class EscalationRiskMonitor:
             state["negative_streak"] = max(
                 state["negative_streak"] + 1, past_negative_streak + 1,
             )
+        elif (
+            state["negative_streak"] >= 2
+            and resolution["status"] in ("open", "unknown")
+            and (repeat_matches or unaddressed_pressure)
+        ):
+            # Nothing has been fixed and the customer is still pressing
+            # on the SAME open issue: a neutral re-statement of it
+            # continues the pressure streak instead of erasing it.
+            # A genuinely calmer message (no unresolved/repeat
+            # pressure) still resets the streak below.
+            state["negative_streak"] = max(
+                state["negative_streak"], past_negative_streak,
+            )
         else:
             state["negative_streak"] = 0
 
@@ -1948,7 +2038,12 @@ class EscalationRiskMonitor:
         # agent echo excluded) plus the session's in-memory counters.
         history_repeats = len(repeat_matches)
         counter_repeats = state["intent_counts"].get(intent, 0)
-        repeats = max(counter_repeats, history_repeats, 1) - 1
+        # `mentions` counts EVERY CUSTOMER message that raised this same
+        # issue, including the one being assessed. It drives the
+        # repeat-pressure curve below, so the risk keeps moving while a
+        # conversation stays unresolved.
+        mentions = max(counter_repeats, history_repeats, 0) + 1
+        repeats = mentions - 1
 
         # A single customer message that BOTH names an unresolved
         # issue AND proves repetition ("twice", "contacted support",
@@ -1971,24 +2066,40 @@ class EscalationRiskMonitor:
             or "nothing happened" in text_lower
         )
 
+        # Repeat pressure may only be ADDED by a message that still
+        # carries pressure of its own. A calm/positive or confirmed-
+        # resolved reply must never look like "the customer raised the
+        # same issue again", otherwise a satisfied customer's risk score
+        # would climb while the conversation is actually improving.
+        message_pressure = (
+            sentiment_label == "negative"
+            or unaddressed_pressure
+            or explicit_repeat_evidence
+            or unresolved_signals
+        )
+        repeat_pressure_allowed = not resolved_eased and message_pressure
+
         if complaint_like and not resolved_eased:
             # Repeat pressure scales with how many CUSTOMER times the
             # same issue was raised — derived from this message's own
             # evidence, never a fixed per-turn delta.
-            repeat_points = min(24, 18 + 6 * repeats)
+            repeat_points = repeated_complaint_points(
+                mentions if mentions >= 2 else 2
+            )
             if repeats >= 1 or explicit_repeat_evidence:
-                total_mentions = repeats + 1
-                if explicit_repeat_evidence and repeats < 1:
-                    total_mentions = 2
+                total_mentions = mentions if mentions >= 2 else 2
                 _add(
                     "repeated_complaint", repeat_points,
                     f"mentions={total_mentions}",
                     f"Repeated complaint: issue '{intent}' raised "
-                    f"{total_mentions} times across customer messages",
+                    f"{total_mentions} times across customer messages "
+                    "(repeat pressure grows with every unresolved "
+                    "repeat)",
                 )
             else:
                 _add(
-                    "complaint_language", repeat_points, intent,
+                    "complaint_language",
+                    repeated_complaint_points(1), intent,
                     "Strong complaint language about "
                     f"'{intent}'",
                 )
@@ -2004,13 +2115,16 @@ class EscalationRiskMonitor:
                 f"Repeated unresolved complaint about '{intent}' "
                 "stated in this customer message",
             )
-        elif max(counter_repeats, history_repeats) >= 2:
+        elif mentions >= 3 and repeat_pressure_allowed:
+            # Count-only inference: the same issue came up again without
+            # complaint wording, so it may only add pressure while this
+            # message itself still carries unresolved pressure.
             _add(
-                "raised_before", 6,
-                f"mentions={max(counter_repeats, history_repeats) + 1}",
-                f"Customer has raised '{intent}' "
-                f"{max(counter_repeats, history_repeats) + 1} "
-                "times",
+                "raised_before", raised_before_points(mentions),
+                f"mentions={mentions}",
+                f"Customer has raised '{intent}' {mentions} times "
+                "- an unresolved issue raised again keeps adding "
+                "pressure",
             )
 
         # ---- Compound escalation: explicit demand + unresolved ----
@@ -2030,7 +2144,7 @@ class EscalationRiskMonitor:
                 [i["name"] for i in indicators]
             )
             or explicit_repeat_evidence
-            or max(counter_repeats, history_repeats) >= 1
+            or mentions >= 2
         )
         if explicit_demand and unresolved_context:
             _add(
@@ -2172,9 +2286,12 @@ class EscalationRiskMonitor:
 
         if previous is None:
             trend = "first_message"
-        elif score > previous + 4:
+        elif score > previous + 1:
+            # Any real rise is reported as increasing: a still-unresolved
+            # conversation must never label a rising risk as "stable"
+            # (a 1-point difference is treated as noise/flat).
             trend = "increasing"
-        elif score < previous - 4:
+        elif score < previous - 1:
             trend = "decreasing"
         else:
             trend = "stable"
