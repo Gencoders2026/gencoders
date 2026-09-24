@@ -29,7 +29,6 @@ LLM call required) so they always respond in real time.
 import hashlib
 import os
 import re
-from collections import Counter
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
@@ -37,6 +36,7 @@ from analysis_core import (
     detect_emotion as ac_detect_emotion,
     detect_intent as ac_detect_intent,
     detect_sentiment as ac_detect_sentiment,
+    emotion_label_for_level,
 )
 
 
@@ -134,6 +134,92 @@ _AGENT_POLITENESS_WORDS = frozenset([
 _NEGATIVE_STREAK_PHRASES = frozenset([
     "fed up", "no help", "not happy", "not resolved", "not satisfied",
 ])
+
+
+# ==========================================================
+# CUSTOMER-STATE EVIDENCE
+# ==========================================================
+# The customer's emotion / frustration may ONLY move when the
+# CUSTOMER'S OWN message provides evidence. Agent politeness never
+# appears in these lists.
+
+# Genuine calming evidence (the customer sounds reassured / satisfied).
+_CALM_APPRECIATION_WORDS = (
+    "thank", "thanks", "appreciate", "appreciated", "grateful",
+)
+_CALM_POSITIVE_WORDS = (
+    "good", "great", "perfect", "glad", "pleased", "happy", "excellent",
+    "awesome", "wonderful", "helpful", "that works", "that helped",
+    "sounds good", "no problem", "all good", "love it", "nice",
+)
+_CALM_UNDERSTANDING_RE = re.compile(
+    r"\b(?:ok|okay|fine|understood|understands|got it|noted|"
+    r"makes sense|i understand|fair enough)\b"
+)
+
+# Negation guard: "not happy", "isn't resolved", "don't understand" ...
+# must NEVER be read as calming / resolved evidence.
+_NEGATION_RE = re.compile(
+    r"\b(?:not|no|never|n't|isn't|wasn't|weren't|aren't|don't|doesn't|"
+    r"didn't|can't|cannot|won't|nothing|none)\b"
+)
+
+
+def _has_unnegated(text_lower: str, needles) -> bool:
+    """
+    True when at least one needle occurs in the text WITHOUT being
+    negated shortly before it.
+
+    This is what stops "not resolved" from counting as a resolution
+    confirmation and "not happy" from counting as calming evidence.
+    """
+    if isinstance(needles, str):
+        needles = (needles,)
+    for needle in needles:
+        start = 0
+        while True:
+            index = text_lower.find(needle, start)
+            if index == -1:
+                break
+            window = text_lower[max(0, index - 24):index]
+            if not _NEGATION_RE.search(window):
+                return True
+            start = index + len(needle)
+    return False
+
+# How much each kind of calming evidence counts (capped at 1.0). The
+# sum decides HOW FAR frustration is allowed to fall - it is never a
+# fixed per-turn step.
+_CALM_EVIDENCE_WEIGHTS = {
+    "resolution confirmed": 1.0,
+    "appreciation": 0.35,
+    "positive language": 0.30,
+    "understanding": 0.20,
+    "agent commitment": 0.30,
+}
+
+# Signals that the customer's concern is still NOT addressed.
+_UNRESOLVED_MARKERS = (
+    "still", "again", "yet", "not resolved", "isn't resolved", "unresolved",
+    "no update", "no solution", "nothing happened", "keeps happening",
+    "same issue", "same problem", "how long", "when will", "no help",
+    "nobody", "no one", "twice", "two times", "waiting", "waited",
+    "long enough", "contacted support", "contacted you", "fed up",
+)
+_REPEAT_MARKERS = (
+    "twice", "two times", "three times", "multiple times", "again",
+    "contacted support", "contacted you", "nobody has helped",
+    "nobody helped", "no one has helped", "still no", "still not",
+    "keeps happening", "same issue", "same problem",
+)
+_ESCALATION_DEMAND_MARKERS = (
+    "supervisor", "manager", "escalate", "human agent", "real person",
+    "someone else", "higher department", "speak to a", "talk to a",
+)
+_URGENCY_MARKERS = (
+    "immediately", "urgent", "urgently", "asap", "right now",
+    "as soon as possible", "end of day",
+)
 
 
 def _utc_now_iso() -> str:
@@ -1028,6 +1114,31 @@ class EscalationRiskMonitor:
                 out.append(content.lower())
         return out
 
+    def _context_from_history(
+        self,
+        customer_history: Optional[List[Dict]],
+        current_text_lower: str,
+    ) -> Tuple[List, List[str]]:
+        """
+        Split a role-tagged conversation into
+        (customer history with roles, agent history).
+
+        The message currently being assessed is REMOVED from the
+        customer history when the caller passed the whole conversation
+        (as the UI does), so it can never be counted as its own
+        "previous" message - no double-counted streaks or repeats.
+        """
+        roles = self._customer_history_texts(
+            customer_history, _include_roles=True
+        )
+        if roles:
+            last_role, last_text = roles[-1]
+            if last_role == "customer" and last_text.strip() == (
+                current_text_lower or ""
+            ).strip():
+                roles = roles[:-1]
+        return roles, self._agent_entries(customer_history)
+
     @staticmethod
     def _resolution_state(
         customer_past_texts: List,
@@ -1040,7 +1151,8 @@ class EscalationRiskMonitor:
         Returns {"status": "open"|"unknown"|"offered"|"resolved",
                  "evidence": [...]} where:
         - "resolved"  only the CUSTOMER confirms a fix ("thank you,
-                      it's resolved now").
+                      it's resolved now"). A NEGATED mention such as
+                      "not resolved" never counts.
         - "offered"   the AGENT gave a concrete commitment ("within
                       2 days", "I have escalated") AND the customer
                       does not contradict it in any later customer
@@ -1061,9 +1173,11 @@ class EscalationRiskMonitor:
                         hits.append(phrase)
             return hits
 
+        # "not resolved" / "isn't fixed" must never read as resolved.
         customer_resolved = [
             t for t in past_customers
             if _phrases([t], _CUSTOMER_RESOLUTION_WORDS)
+            and _has_unnegated(t, _CUSTOMER_RESOLUTION_WORDS)
         ]
         customer_requests = [
             t for t in past_customers
@@ -1101,11 +1215,16 @@ class EscalationRiskMonitor:
         current_frustration: int,
         customer_past_texts: List,
         agent_past_texts: List[str],
-    ) -> Tuple[bool, List[str]]:
+    ) -> Tuple[bool, List[str], int]:
         """
-        Compare the CURRENT customer message with its CUSTOMER context:
-        same unresolved issue + no matching resolution progress means
-        the tone is holding or worsening (never improving by default).
+        Compare the CURRENT customer message with its CUSTOMER context.
+
+        Returns (worsening, evidence, points) where `points` is
+        PROPORTIONAL to the unresolved/urgency markers actually found in
+        the message plus the repeat signals already present in the
+        customer's earlier messages - there is no flat per-message
+        penalty, and no points at all when there is no concrete
+        evidence.
         """
         evidence: List[str] = []
         past_customers = [
@@ -1145,13 +1264,15 @@ class EscalationRiskMonitor:
                 "Earlier customer message(s) already described the same "
                 "unresolved issue."
             )
-        worsening = bool(
-            marker_count
-            or (current_label == "negative")
-            or (current_frustration >= 6)
-            or (past_customers and repeat_signals)
-        )
-        return worsening, evidence
+
+        # Points scale with the evidence found; a merely negative message
+        # with no unresolved/urgency marker and no repeat context adds
+        # nothing here.
+        points = 0
+        if marker_count or repeat_signals:
+            points = min(8, 2 + marker_count + min(4, repeat_signals))
+        worsening = bool(marker_count or repeat_signals)
+        return worsening, evidence, points
 
     def _empty_state(self, session_key: str) -> Dict:
         return {
@@ -1249,6 +1370,24 @@ class EscalationRiskMonitor:
                     "message_count": 0,
                     "negative_streak": 0,
                     "assessed_at": _utc_now_iso(),
+                    # Customer state is unknown until a customer
+                    # message has actually been assessed.
+                    "intent": "general_inquiry",
+                    "emotion": "",
+                    "emotion_label": "",
+                    "frustration": 5,
+                    "frustration_level": 5,
+                    "sentiment": {
+                        "label": "neutral",
+                        "score": 0.0,
+                        "confidence": 0.4,
+                    },
+                    "sentiment_label": "neutral",
+                    "satisfaction_trend": "unknown",
+                    "unaddressed_pressure": False,
+                    "de_escalation": "none",
+                    "calm_evidence": [],
+                    "state_drivers": [],
                 },
                 "general_inquiry",
                 "",
@@ -1277,72 +1416,312 @@ class EscalationRiskMonitor:
         )
 
     # ------------------------------------------------------
-    # Shared customer-message analysis (single source of truth)
+    # Shared customer-message state (single source of truth)
     # ------------------------------------------------------
-    @staticmethod
-    def _analyse_customer_message(
+    def _customer_state_from_evidence(
+        self,
         text_lower: str,
         customer_past_texts,
         agent_past_texts: Optional[List[str]] = None,
+        previous_state: Optional[Dict] = None,
     ) -> Dict:
         """
-        Re-analyse a CUSTOMER message from its own text + CUSTOMER
-        context, so sentiment / emotion / frustration always describe
-        the customer's actual reply — never agent politeness, and never
-        a stale caller value.
+        Recalculate the customer's emotion, emotion intensity and
+        sentiment from the LATEST customer message PLUS the previous
+        customer state and the conversation context.
+
+        This is the ONLY place where the displayed emotion/frustration
+        of a customer message is produced, so the UI values can never
+        disagree with each other. Rules (evidence only):
+
+        * the severity of the latest message is the base signal;
+        * unresolved / repeated / urgent / escalation evidence raises it;
+        * frustration may only FALL when the CUSTOMER'S message carries
+          calming evidence (resolution confirmation, appreciation,
+          positive language, understanding) or the agent gave a
+          concrete, uncontradicted commitment - and the drop is
+          proportional to that evidence, never a fixed -1/-2/-3;
+        * a mildly negative or still-unresolved message can therefore
+          never make a furious state collapse: without de-escalation
+          evidence the running value is HELD;
+        * nothing is ever changed randomly and nothing is ever driven
+          by the turn number.
         """
         intent = ac_detect_intent(text_lower)
-        emotion_label, frustration = ac_detect_emotion(text_lower)
+        _base_label, message_level = ac_detect_emotion(text_lower)
         analysed = ac_detect_sentiment(text_lower)
         sentiment_label = analysed.get("label", "neutral")
+        sentiment_score = analysed.get("score", 0.0)
+        sentiment_confidence = analysed.get("confidence", 0.4)
 
         past_customers = [
             t[1] if isinstance(t, tuple) else str(t)
             for t in (customer_past_texts or [])
         ]
 
+        # ---- evidence in the LATEST message -------------------
+        open_evidence = sorted(
+            p for p in _RESOLUTION_REQUEST_WORDS if p in text_lower
+        )
+        unresolved_evidence = sorted(
+            p for p in _UNRESOLVED_MARKERS if p in text_lower
+        )
+        repeat_evidence = sorted(
+            p for p in _REPEAT_MARKERS if p in text_lower
+        )
+        escalation_evidence = sorted(
+            p for p in _ESCALATION_DEMAND_MARKERS if p in text_lower
+        )
+        urgency_evidence = sorted(
+            p for p in _URGENCY_MARKERS if p in text_lower
+        )
+
+        # An unmet need expressed together with unresolved history is
+        # NEGATIVE: "I have waited long enough. I need this resolved
+        # immediately." is not a neutral request.
+        history_negative = any(
+            self._count_customer_negative_streak("negative", [past]) >= 1
+            for past in past_customers
+        )
         if sentiment_label != "negative":
-            requests_open = any(
-                phrase in text_lower
-                for phrase in _RESOLUTION_REQUEST_WORDS
-            )
-            negative_markers = sum(
-                1 for marker in (
-                    "long enough", "still", "yet", "again", "waiting",
-                    "waited", "never", "nobody", "no one", "no help",
-                    "twice", "contacted support", "contacted you",
-                    "unresolved", "not resolved",
-                )
-                if marker in text_lower
-            )
-            history_negative = any(
-                EscalationRiskMonitor._count_customer_negative_streak(
-                    "negative", [past]
-                ) >= 1
-                for past in past_customers
-            )
-            if requests_open and (negative_markers or history_negative):
+            if open_evidence and (unresolved_evidence or history_negative):
                 sentiment_label = "negative"
-                analysed = {
-                    "label": "negative",
-                    "score": min(-0.5, analysed.get("score", 0.0) - 0.5),
-                    "confidence": max(
-                        0.6, analysed.get("confidence", 0.0)
-                    ),
-                }
-                if emotion_label == "Frustrated" and frustration < 6:
-                    frustration = 6
-                elif emotion_label == "Calm":
-                    emotion_label, frustration = "Frustrated", 5
+                sentiment_score = min(-0.5, sentiment_score - 0.5)
+                sentiment_confidence = max(0.6, sentiment_confidence)
+
+        negative = sentiment_label == "negative"
+
+        # ---- resolution state from the whole conversation -----
+        resolution = self._resolution_state(
+            customer_past_texts, agent_past_texts or []
+        )
+        resolved_now = _has_unnegated(text_lower, _CUSTOMER_RESOLUTION_WORDS)
+
+        # ---- calming evidence (customer-written only) ---------
+        calm_evidence: List[str] = []
+
+        def _add_calm(name: str, present: bool) -> None:
+            if present and name not in calm_evidence:
+                calm_evidence.append(name)
+
+        _add_calm("resolution confirmed", resolved_now)
+        _add_calm(
+            "appreciation",
+            _has_unnegated(text_lower, _CALM_APPRECIATION_WORDS),
+        )
+        _add_calm(
+            "positive language",
+            _has_unnegated(text_lower, _CALM_POSITIVE_WORDS),
+        )
+        understanding_match = _CALM_UNDERSTANDING_RE.search(text_lower)
+        _add_calm(
+            "understanding",
+            bool(understanding_match) and not _NEGATION_RE.search(
+                text_lower[
+                    max(0, understanding_match.start() - 24):
+                    understanding_match.start()
+                ]
+            ) if understanding_match else False,
+        )
+
+        agent_commitment = None
+        for agent_text in agent_past_texts or []:
+            match = _AGENT_COMMITMENT_RE.search(agent_text or "")
+            if match:
+                agent_commitment = match.group(0).strip()
+                break
+        # A concrete commitment only counts while the customer has not
+        # contradicted it and is no longer negative.
+        _add_calm(
+            "agent commitment",
+            bool(agent_commitment)
+            and not negative
+            and not (unresolved_evidence or repeat_evidence
+                     or escalation_evidence),
+        )
+
+        calming_strength = sum(
+            _CALM_EVIDENCE_WEIGHTS.get(name, 0.0) for name in calm_evidence
+        )
+        if resolved_now:
+            calming_strength = 1.0
+        calming_strength = min(1.0, round(calming_strength, 2))
+
+        # ---- is the customer's concern still NOT addressed? ---
+        repeat_history = self._repeat_issue_customers_only(
+            intent, text_lower, customer_past_texts
+        )
+        open_pressure = bool(
+            open_evidence or unresolved_evidence or repeat_evidence
+            or escalation_evidence or urgency_evidence
+        )
+        unaddressed_pressure = bool(
+            open_pressure or repeat_history or negative
+        )
+
+        # ---- message-level target (context may only RAISE it) --
+        target = message_level
+        if escalation_evidence:
+            target = max(target, 9)
+        elif repeat_evidence and (unresolved_evidence or open_evidence):
+            target = max(target, 7)
+        elif urgency_evidence and negative:
+            target = max(target, 7)
+        target = max(1, min(10, int(target)))
+
+
+        # ---- blend with the customer's RUNNING state ----------
+        previous_level = None
+        if isinstance(previous_state, dict):
+            try:
+                previous_level = int(previous_state.get("frustration"))
+            except (TypeError, ValueError):
+                previous_level = None
+            if previous_level is not None and not 1 <= previous_level <= 10:
+                previous_level = None
+
+        drivers: List[str] = []
+
+        if previous_level is None:
+            level = target
+            drivers.append(
+                f"First customer message: frustration {level}/10 taken "
+                "from the message itself."
+            )
+        elif target >= previous_level:
+            level = target
+            if target > previous_level:
+                drivers.append(
+                    "Latest customer message is harder than the running "
+                    f"state ({previous_level} -> {target}/10)."
+                )
+            else:
+                drivers.append(
+                    "Latest customer message carries the same pressure as "
+                    f"the running state ({previous_level}/10) - held, "
+                    "not reduced."
+                )
+        elif resolved_now:
+            level = target
+            drivers.append(
+                "Customer confirmed the issue is resolved - frustration "
+                f"released {previous_level} -> {target}/10."
+            )
+        elif calming_strength >= 0.5 and not unaddressed_pressure:
+            step = max(2, round((previous_level - target) * 0.7))
+            level = max(target, previous_level - step)
+            drivers.append(
+                f"Strong calming evidence ({', '.join(calm_evidence)}) - "
+                f"proportional release {previous_level} -> {level}/10."
+            )
+        elif calming_strength >= 0.15 and not unaddressed_pressure:
+            step = max(1, round((previous_level - target) * 0.35))
+            level = max(target, previous_level - step)
+            drivers.append(
+                f"Calming evidence ({', '.join(calm_evidence)}) allows a "
+                f"proportional easing {previous_level} -> {level}/10."
+            )
+        else:
+            level = previous_level
+            pressure_note = (
+                "issue still open/repeated"
+                if unaddressed_pressure else "no calming language"
+            )
+            drivers.append(
+                "No de-escalation evidence in this message "
+                f"({pressure_note}) - frustration held at "
+                f"{previous_level}/10 instead of dropping."
+            )
+
+        level = max(1, min(10, int(level)))
+
+        # ---- how much genuine de-escalation evidence is there? --
+        if resolved_now or (
+            sentiment_label == "positive" and not unaddressed_pressure
+        ):
+            de_escalation = "strong"
+        elif calming_strength >= 0.15 and not unaddressed_pressure:
+            de_escalation = "moderate"
+        else:
+            de_escalation = "none"
 
         return {
             "intent": intent,
-            "emotion_label": emotion_label,
-            "frustration": frustration,
+            "emotion_label": emotion_label_for_level(level),
+            "frustration": level,
+            "message_level": message_level,
             "sentiment_label": sentiment_label,
-            "sentiment_score": analysed.get("score", 0.0),
-            "sentiment_confidence": analysed.get("confidence", 0.4),
+            "sentiment_score": round(sentiment_score, 3),
+            "sentiment_confidence": round(sentiment_confidence, 3),
+            "resolution": resolution,
+            "resolved_now": resolved_now,
+            "agent_commitment": agent_commitment,
+            "calm_evidence": calm_evidence,
+            "calming_strength": calming_strength,
+            "open_evidence": open_evidence,
+            "unresolved_evidence": unresolved_evidence,
+            "repeat_evidence": repeat_evidence,
+            "escalation_evidence": escalation_evidence,
+            "urgency_evidence": urgency_evidence,
+            "repeat_history": repeat_history,
+            "unaddressed_pressure": unaddressed_pressure,
+            "de_escalation": de_escalation,
+            "drivers": drivers,
         }
+
+    # ------------------------------------------------------
+    # Backwards-compatible analysis helper
+    # ------------------------------------------------------
+    def _analyse_customer_message(
+        self,
+        text_lower: str,
+        customer_past_texts,
+        agent_past_texts: Optional[List[str]] = None,
+        previous_state: Optional[Dict] = None,
+    ) -> Dict:
+        """
+        Thin wrapper: the customer state for one message (+ context and,
+        when provided, the running customer state) with no risk scoring.
+        """
+        return self._customer_state_from_evidence(
+            text_lower,
+            customer_past_texts,
+            agent_past_texts,
+            previous_state,
+        )
+
+    @staticmethod
+    def _satisfaction_trend(
+        *,
+        first_message: bool,
+        escalation_trend: str,
+        sentiment_label: str,
+        unaddressed_pressure: bool,
+        de_escalation: str,
+    ) -> str:
+        """
+        Satisfaction trend from the SAME evidence as the risk score, so
+        it can never contradict the escalation trend:
+
+        * risk rising            -> satisfaction declining
+        * risk falling           -> satisfaction improving
+        * risk unchanged         -> negative/unresolved stays declining,
+                                    clear positive evidence improves,
+                                    otherwise steady.
+
+        A still-unresolved complaint therefore never reports "improving".
+        """
+        if first_message:
+            return "unknown"
+        if escalation_trend == "increasing":
+            return "declining"
+        if escalation_trend == "decreasing":
+            return "improving"
+        if sentiment_label == "negative" or unaddressed_pressure:
+            return "declining"
+        if sentiment_label == "positive" and de_escalation != "none":
+            return "improving"
+        return "steady"
 
     # ------------------------------------------------------
     # Core assessment
@@ -1401,16 +1780,33 @@ class EscalationRiskMonitor:
         message = (customer_message or "").strip()
         text_lower = message.lower()
 
-        customer_history_roles = self._customer_history_texts(
-            customer_history, _include_roles=True
+        # Idempotency FIRST: re-assessing the exact same message + turn
+        # must return the cached result and must never move the
+        # stateful customer values twice.
+        signature = hashlib.md5(
+            f"{turn}|{text_lower}".encode("utf-8")
+        ).hexdigest()
+        if (
+            state["last_signature"] == signature
+            and state["last_result"] is not None
+        ):
+            return state["last_result"]
+
+        customer_history_roles, agent_past_texts = (
+            self._context_from_history(customer_history, text_lower)
         )
         customer_past_texts = [text for _, text in customer_history_roles]
-        agent_past_texts = self._agent_entries(customer_history)
 
-        # Re-analyse the CUSTOMER message itself here so a wrong or
-        # stale caller analysis can never force the risk up or down.
-        analysis = self._analyse_customer_message(
-            text_lower, customer_past_texts, agent_past_texts
+        # Re-derive the CUSTOMER state (intent / emotion / frustration /
+        # sentiment) from the message + customer context + the customer's
+        # RUNNING state, so a stale caller value can never set the risk
+        # and a mildly negative message can never collapse a furious
+        # state (see `_customer_state_from_evidence`).
+        analysis = self._customer_state_from_evidence(
+            text_lower,
+            customer_history_roles,
+            agent_past_texts,
+            state.get("last_analysis"),
         )
         intent = analysis["intent"]
         emotion_label = analysis["emotion_label"]
@@ -1421,38 +1817,25 @@ class EscalationRiskMonitor:
             "score": analysis["sentiment_score"],
             "confidence": analysis["sentiment_confidence"],
         }
-
-        signature = hashlib.md5(
-            f"{turn}|{text_lower}".encode("utf-8")
-        ).hexdigest()
-
-        if (
-            state["last_signature"] == signature
-            and state["last_result"] is not None
-        ):
-            return state["last_result"]
+        resolution = analysis["resolution"]
+        resolved_now = analysis["resolved_now"]
+        de_escalation = analysis["de_escalation"]
+        unaddressed_pressure = analysis["unaddressed_pressure"]
+        calm_evidence = analysis["calm_evidence"]
+        state_drivers = analysis["drivers"]
 
         indicators: List[Dict] = []
         reasoning: List[str] = []
         score = 0
-        reasoning.append(
-            "Risk recomputed from this customer message and its "
-            "customer context (no fixed per-turn change)."
-        )
 
-        resolution = self._resolution_state(
-            customer_history_roles, agent_past_texts
-        )
-        worsening, tone_evidence = self._tone_worsening(
+        worsening, tone_evidence, tone_points = self._tone_worsening(
             text_lower,
             sentiment_label,
             frustration_score,
             customer_history_roles,
             agent_past_texts,
         )
-        repeat_matches = self._repeat_issue_customers_only(
-            intent, text_lower, customer_history_roles
-        )
+        repeat_matches = analysis["repeat_history"]
 
         def _add(name, points, matched, reason):
             nonlocal score
@@ -1466,23 +1849,28 @@ class EscalationRiskMonitor:
             reasoning.append(f"{reason} (+{score_points}).")
 
         # ---- Resolution progress ---------------------------------
-        # NO fixed per-turn easing (-30 / -12 removed): risk responds
-        # proportionally to the actual customer message + context.
-        # "resolved"/"offered" only SUPPRESS open-issue pressure
-        # indicators below; they never subtract a constant, and an
-        # agent reply alone can never lower the customer's score.
-        if resolution["status"] == "resolved":
-            reasoning.append(
-                "Customer confirmed the issue is resolved "
-                f"({', '.join(resolution['evidence']) or 'explicit confirmation'}) "
-                "— open-issue pressure no longer applies."
-            )
-        elif resolution["status"] == "offered":
-            reasoning.append(
-                "Agent gave a concrete commitment and the customer has "
-                f"not contradicted it ({', '.join(resolution['evidence'])})."
-            )
+        # NO fixed per-turn easing: risk responds proportionally to the
+        # actual customer message + context. "resolved"/"offered" only
+        # SUPPRESS open-issue pressure below; they never subtract a
+        # constant, and an agent reply alone can never lower the score.
         resolved_eased = resolution["status"] in ("resolved", "offered")
+        if resolved_eased and (
+            unaddressed_pressure or repeat_matches
+        ):
+            # Only reported when it actually changed the outcome.
+            if resolution["status"] == "resolved":
+                reasoning.append(
+                    "Customer confirmed the issue is resolved "
+                    f"({', '.join(resolution['evidence']) or 'explicit confirmation'}"
+                    ") — no open-issue pressure added."
+                )
+            else:
+                reasoning.append(
+                    "Agent gave a concrete commitment and the customer has "
+                    "not contradicted it "
+                    f"({', '.join(resolution['evidence'])}) — no repeated-"
+                    "complaint pressure added."
+                )
 
         # ---- Phrase-based indicators --------------------------
         for name, (points, phrases) in self.INDICATOR_PATTERNS.items():
@@ -1675,47 +2063,136 @@ class EscalationRiskMonitor:
 
         # ---- Tone drift vs CUSTOMER context ---------------------
         # The risk must not fall just because an agent reply was
-        # polite: if the message reads as harsh/urgent as its context
-        # and nothing was resolved, hold the line instead of easing.
-        if worsening and resolution["status"] in ("open", "unknown") and not resolved_eased:
+        # polite: unresolved/urgency markers plus repeat context add
+        # PROPORTIONAL pressure while the issue stays open.
+        if (
+            worsening
+            and tone_points
+            and resolution["status"] in ("open", "unknown")
+            and not resolved_eased
+        ):
             _add(
-                "tone_holding_or_worsening", 6,
-                "open issue, no resolution progress",
+                "tone_holding_or_worsening", tone_points,
+                "unresolved/urgency markers in the latest message",
                 "Customer tone is holding or worsening while the "
                 "issue stays open",
             )
             for line in tone_evidence:
                 reasoning.append(f"Tone context: {line}")
 
-        # ---- Final score / level / trend ------------------------
+        # ---- Final score: recomputed from THIS reply + context ----
+        # Every customer reply triggers a FRESH score (computed above
+        # from the latest message + conversation context: indicators,
+        # frustration, negative streak, repeats, urgency, resolution).
+        # The previous score is never reused as the value - it is only
+        # the reference that decides whether the fresh evidence shows
+        # genuine improvement:
+        #   * fresh score above previous      -> used as-is (pressure
+        #     evidence raises risk immediately)
+        #   * fresh score lower WITH strong
+        #     de-escalation/resolution evidence in THIS message
+        #     -> used as-is (full evidence-based drop)
+        #   * fresh score lower WITH moderate calming evidence
+        #     -> eased proportionally to the gap (never a fixed
+        #     per-turn delta, and only while the issue is open)
+        #   * fresh score lower WITHOUT any improvement evidence
+        #     (message still negative / issue still unresolved /
+        #     no calming language) -> stays at the previous level:
+        #     a milder phrasing alone is not evidence that anything
+        #     got better, and risk must stay consistent with the
+        #     still-high frustration and negative sentiment.
+        # Agent replies never reach this method, so an agent
+        # apology alone can never move the risk. Direction and size
+        # of every change come from the message content, never from
+        # the turn number.
         previous = (
             state["assessments"][-1]["score"]
             if state["assessments"] else None
         )
-
         score = clamp_score(score)
+
+        if previous is None:
+            reasoning.append(
+                f"Risk initialised at {score}/100 from this first "
+                "customer message."
+            )
+        elif score > previous:
+            reasoning.append(
+                f"Risk recalculated {previous} -> {score}/100: this "
+                "customer message adds escalation evidence in context."
+            )
+        elif score < previous and (
+            de_escalation == "strong" or resolved_now
+        ):
+            resolution_evidence = ", ".join(
+                resolution.get("evidence") or []
+            )
+            drop_evidence = (
+                ", ".join(calm_evidence)
+                or resolution_evidence
+                or "positive, pressure-free language"
+            )
+            reasoning.append(
+                f"Risk recalculated {previous} -> {score}/100: the "
+                "latest customer message shows genuine de-escalation "
+                f"evidence ({drop_evidence})."
+            )
+        elif score < previous and de_escalation == "moderate":
+            step = max(1, round((previous - score) * 0.4))
+            score = max(score, previous - step)
+            reasoning.append(
+                f"Risk eased {previous} -> {score}/100: calming "
+                "evidence in this customer message lowers pressure, "
+                "but the issue is not confirmed resolved yet "
+                f"({', '.join(calm_evidence) or 'calming language'})."
+            )
+        elif score < previous:
+            # Recalculated fresh - and the fresh evidence shows no
+            # improvement, so the lower number only reflects milder
+            # phrasing, not a better situation.
+            score = previous
+            pressure_note = (
+                "issue still negative/unresolved"
+                if unaddressed_pressure or sentiment_label == "negative"
+                else "no de-escalation evidence"
+            )
+            reasoning.append(
+                f"Risk recalculated at {score}/100 with no lowering "
+                f"evidence in this message ({pressure_note}): risk "
+                "falls only when the customer's reply shows genuine "
+                "improvement."
+            )
+        else:
+            reasoning.append(
+                f"Risk recalculated at {score}/100: this customer "
+                "message neither adds nor removes escalation evidence."
+            )
+
         level = risk_level_for_score(score)
 
         if previous is None:
             trend = "first_message"
-        elif score > previous + 5:
+        elif score > previous + 4:
             trend = "increasing"
-        elif score < previous - 5:
+        elif score < previous - 4:
             trend = "decreasing"
         else:
             trend = "stable"
 
-        if previous is not None:
-            reasoning.append(
-                f"Risk trend: {previous} -> {score} after this "
-                f"message ({trend})."
-            )
-
         if not reasoning:
             reasoning.append(
-                "No strong escalation indicators in this customer "
-                "message — low conversational risk."
+                "No escalation indicators and no de-escalation evidence "
+                "in this customer message — low conversational risk."
             )
+
+        # ---- Satisfaction trend from the SAME evidence -----------
+        satisfaction_trend = self._satisfaction_trend(
+            first_message=previous is None,
+            escalation_trend=trend,
+            sentiment_label=sentiment_label,
+            unaddressed_pressure=unaddressed_pressure,
+            de_escalation=de_escalation,
+        )
 
         # ---- Configurable threshold alert -----------------------
         effective_threshold = (
@@ -1745,19 +2222,25 @@ class EscalationRiskMonitor:
         state["intent_counts"][intent] = (
             state["intent_counts"].get(intent, 0) + 1
         )
-        # Capture the PREVIOUS customer analysis (before overwrite)
-        # so the API can derive a satisfaction trend from actual
-        # customer evidence, not from a fixed per-turn step.
+        # Capture the PREVIOUS customer state (before overwrite) and the
+        # new one: the next customer message blends against it, and the
+        # API reads the same object, so no second calculation exists.
         state["previous_analysis"] = state.get("last_analysis")
         state["last_analysis"] = {
             "intent": intent,
             "emotion": emotion_label,
             "frustration": frustration_score,
+            "message_level": analysis["message_level"],
             "sentiment": {
                 "label": sentiment_label,
                 "score": sentiment["score"],
                 "confidence": sentiment["confidence"],
             },
+            "resolution_status": resolution["status"],
+            "unaddressed_pressure": unaddressed_pressure,
+            "de_escalation": de_escalation,
+            "calm_evidence": calm_evidence,
+            "drivers": state_drivers,
         }
         # Remember the latest CUSTOMER message so the next assessment
         # can compare against genuine customer context (agent replies
@@ -1802,6 +2285,23 @@ class EscalationRiskMonitor:
             "customer_message": message,
             "analyzed_customer_message": True,
             "resolution_status": resolution["status"],
+
+            # ---- Customer state: single source of truth for the UI ----
+            # These are the exact values the displayed Emotion /
+            # Intensity / Frustration / Sentiment / Trending come from.
+            "intent": intent,
+            "emotion": emotion_label,
+            "emotion_label": emotion_label,
+            "frustration": frustration_score,
+            "frustration_level": frustration_score,
+            "message_level": analysis["message_level"],
+            "sentiment": sentiment,
+            "sentiment_label": sentiment_label,
+            "de_escalation": de_escalation,
+            "calm_evidence": calm_evidence,
+            "unaddressed_pressure": unaddressed_pressure,
+            "state_drivers": state_drivers,
+            "satisfaction_trend": satisfaction_trend,
         }
 
         state["last_signature"] = signature

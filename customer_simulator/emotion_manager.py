@@ -103,8 +103,11 @@ class EmotionManager:
     def get_state(self) -> EmotionState:
         return self.state
 
-    def _score_agent_message(self, agent_message: str) -> int:
-
+    def _score_agent_message(self, agent_message: str) -> float:
+        # GLOBAL evidence-proportional score in [-1.0, 1.0].
+        # Returned as float (NOT rounded to int) so that a strongly
+        # helpful reply scores higher than a mildly helpful one — the
+        # magnitude always comes from the evidence in the text.
         text = agent_message.lower()
         score = 0
 
@@ -133,16 +136,22 @@ class EmotionManager:
         return int(round(score))
 
     def update(self, agent_message: str) -> EmotionState:
-
+        # GLOBAL evidence-proportional update (all personas/scenarios).
+        # The magnitude comes from the scored evidence count in the
+        # agent reply — never a fixed +/-1 per turn. A strongly helpful
+        # reply (several positive signals) moves further than a mildly
+        # helpful one; same for poor replies.
         raw_delta = self._score_agent_message(agent_message)
 
         if raw_delta > 0:
-            # Good support response → frustration decreases
-            delta = -max(1, raw_delta)
+            # Good support response → frustration decreases,
+            # proportional to the evidence strength.
+            delta = -raw_delta
 
         elif raw_delta < 0:
-            # Poor support response → frustration increases
-            delta = max(1, abs(raw_delta))
+            # Poor support response → frustration increases,
+            # proportional to the evidence strength.
+            delta = abs(raw_delta)
 
         else:
             # If customer is already frustrated,

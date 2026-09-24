@@ -21,6 +21,7 @@ Frustration level is the emotional control.
 import uuid
 import json
 import random
+import re
 from pathlib import Path
 from typing import Dict, Any, Optional
 
@@ -219,68 +220,45 @@ class CustomerSimulator:
         text = agent_message.lower()
 
         # ------------------------------------------------------
-        # FRUSTRATION CHANGES BASED ON AGENT RESPONSE
+        # DYNAMIC FRUSTRATION ADJUSTMENT (evidence-based)
         # ------------------------------------------------------
+        # Frustration is NEVER adjusted by a fixed per-turn delta.
+        # The simulated customer's frustration is recalculated from the
+        # evidence found in the AGENT's actual reply:
+        #
+        #   - a genuine, scenario-specific resolution releases a share
+        #     of the CURRENT frustration (proportional, so a furious
+        #     customer is released further than a mildly annoyed one);
+        #   - every other reply is scored in [-1.0, 1.0] from concrete
+        #     commitments, issue/goal acknowledgement, empathy and
+        #     poor/evasive signals, and frustration moves by a
+        #     proportional amount (never a flat +/-1 per turn).
+        resolved = self._is_resolved(text)
 
-        helpful_words = [
-            "processed",
-            "confirmed",
-            "completed",
-            "resolved",
-            "refund",
-            "delivery date",
-            "tracking",
-            "check",
-            "checked",
-            "escalated",
-            "fixed",
-            "solution",
-            "timeline",
-            "next step",
-            "help"
-        ]
-
-        poor_words = [
-            "wait",
-            "soon",
-            "later",
-            "can't help",
-            "cannot help",
-            "nothing i can do",
-            "don't know",
-            "do not know",
-            "not my problem"
-        ]
-
-        if any(word in text for word in poor_words):
-
-            self.frustration_level = min(
-                10,
-                self.frustration_level + 1
-            )
-
-        elif any(word in text for word in helpful_words):
-
+        if resolved:
+            # Proportional release: higher frustration means a bigger
+            # drop because the customer is genuinely relieved.
+            reduction = max(2, round(self.frustration_level * 0.55))
             self.frustration_level = max(
                 1,
-                self.frustration_level - 1
+                self.frustration_level - reduction
             )
-
-        # ------------------------------------------------------
-        # RESOLUTION
-        # ------------------------------------------------------
-
-        if self._is_resolved(text):
-
-            # A genuine resolution strongly placates the customer,
-            # even if they were very angry before.
+        else:
+            quality = self._assess_agent_response_quality(agent_message)
+            delta = round(quality * 3)
+            if delta == 0 and abs(quality) >= 0.2:
+                delta = 1 if quality > 0 else -1
             self.frustration_level = max(
                 1,
-                self.frustration_level - 4
+                min(10, self.frustration_level - delta)
             )
+
+        # ------------------------------------------------------
+        # RESOLUTION FINISH CHECK
+        # ------------------------------------------------------
 
         if (
-            self._is_resolved(text)
+            resolved
             and self.frustration_level <= 4
         ):
 
@@ -315,6 +293,142 @@ class CustomerSimulator:
 
         return self._build_response(message)
 
+    # ==========================================================
+    # AGENT RESPONSE QUALITY SCORING (dynamic, evidence-based)
+    # ==========================================================
+    def _assess_agent_response_quality(self, agent_message: str) -> float:
+        """
+        Dynamically score how helpful the agent's response is for the
+        current scenario, returning a float in [-1.0, 1.0].
+
+        The score reflects *evidence* found in the actual agent text —
+        NOT a fixed per-turn change and NOT a scenario-agnostic keyword
+        list.  A response with concrete commitments, issue-specific
+        acknowledgment and empathy scores high (toward +1.0); a vague,
+        evasive or outright poor reply scores low (toward -1.0).
+
+        Scoring factors (each derived from the text, not a constant):
+        - Concrete commitment signals (timeline, processed action, etc.)
+        - Scenario-specific issue acknowledgment
+        - Goal-oriented language
+        - Genuine empathy / apology
+        - Genuine resolution confirmation (strongest positive)
+        - Poor / unhelpful / evasive signals
+        - Effort / message length
+        """
+        text = agent_message.lower()
+        scenario = SCENARIOS[self.scenario_name]
+        issue = scenario["issue"]
+        goal = scenario["goal"]
+
+        score = 0.0
+
+        # --- Concrete commitment signals ---
+        commit_patterns = [
+            r"within\s+\d+\s*(?:-\s*\d+\s*)?(?:business\s+)?"
+            r"(?:day|hour|minute)s?",
+            r"\b(processed|completed|confirmed|issued|"
+            r"refunded|escalated)\b",
+            r"\btracking\s+(number|status|shows?)\b",
+            r"\bdelivery\s+date\b",
+            r"\breship(?:ped|ment)?\b",
+            r"\breplac(?:ed|ement|ing)\b",
+            r"\b(compensation|discount|credit|voucher)\b",
+            r"\b(next step|next steps)\b",
+            r"\b(a full refund|refund)\b",
+            r"\b(escalat(e|ing|ed) to (a )?(manager|supervisor))\b",
+        ]
+        commit_hits = sum(
+            1 for p in commit_patterns if re.search(p, text)
+        )
+        if commit_hits >= 3:
+            score += 0.6
+        elif commit_hits == 2:
+            score += 0.4
+        elif commit_hits == 1:
+            score += 0.2
+
+        # --- Scenario-specific issue acknowledgment ---
+        issue_terms = [
+            t for t in re.findall(r"[a-z]+", issue.lower())
+            if len(t) >= 4
+        ]
+        if issue_terms:
+            hits = sum(1 for t in issue_terms if t in text)
+            ratio = hits / len(issue_terms)
+            if ratio >= 0.5:
+                score += 0.2
+            elif hits > 0:
+                score += 0.1
+
+        # --- Goal acknowledgment ---
+        goal_terms = [
+            t for t in re.findall(r"[a-z]+", goal.lower())
+            if len(t) >= 4
+        ]
+        if goal_terms:
+            hits = sum(1 for t in goal_terms if t in text)
+            ratio = hits / len(goal_terms)
+            if ratio >= 0.5:
+                score += 0.15
+
+        # --- Genuine empathy / apology ---
+        empathy_words = [
+            "sorry", "apologize", "apologies", "apology",
+            "i understand", "i completely understand", "i can see",
+            "that must be", "frustrating", "i get it", "of course",
+            "i appreciate", "thank you for your patience",
+            "i hear you", "i completely get it",
+        ]
+        empathy_hits = sum(1 for w in empathy_words if w in text)
+        if empathy_hits >= 2:
+            score += 0.15
+        elif empathy_hits >= 1:
+            score += 0.08
+
+        # --- Genuine resolution (strongest positive evidence) ---
+        if self._is_resolved(text):
+            score += 0.4
+
+        # --- Poor / unhelpful / evasive signals ---
+        poor_patterns = [
+            r"\bwait\b",
+            r"\bsoon\b",
+            r"\blater\b",
+            r"can't help",
+            r"cannot help",
+            r"nothing i can do",
+            r"don't know",
+            r"do not know",
+            r"not my problem",
+            r"\bmaybe\b",
+            r"i'll check",
+            r"let me check",
+            r"outside our control",
+            r"unfortunately",
+            r"\bpolicy\b",
+            r"final sale",
+            r"no refund",
+            r"nothing (we|i) can do",
+        ]
+        poor_hits = sum(
+            1 for p in poor_patterns if re.search(p, text)
+        )
+        if poor_hits >= 3:
+            score -= 0.5
+        elif poor_hits == 2:
+            score -= 0.35
+        elif poor_hits == 1:
+            score -= 0.3
+
+        # --- Effort / length ---
+        word_count = len(agent_message.split())
+        if word_count < 5:
+            score -= 0.1
+        elif word_count >= 20:
+            score += 0.05
+
+        return max(-1.0, min(1.0, round(score, 2)))
 
     # ==========================================================
     # RESOLUTION CHECK
@@ -388,10 +502,6 @@ class CustomerSimulator:
         level = self.frustration_level
 
         band = get_band(level)
-
-        scenario = SCENARIOS[
-            self.scenario_name
-        ]
 
         # ------------------------------------------------------
         # Improved natural messages for every turn

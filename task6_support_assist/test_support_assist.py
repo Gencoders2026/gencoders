@@ -11,6 +11,10 @@ or from the repository root:
     python -m pytest task6_support_assist -v
 """
 
+import os
+
+os.environ.setdefault("TASK6_NO_RAG", "1")
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -690,3 +694,187 @@ def test_support_analyze_supervisor_alert_flow(client):
     assert polite["escalation_score"] < demand["escalation_score"]
 
 
+
+
+# ==========================================================
+# Task 6 correction - state dynamics are driven by the CONTENT of
+# the customer's message, never by the turn number or a fixed +/-.
+# ==========================================================
+def _conversation(monitor, session, turns):
+    """
+    Run [(agent, customer), ...] through the monitor exactly like the
+    console does (the whole conversation is passed as history) and
+    return the per-turn assessment results.
+    """
+    history = []
+    results = []
+    for turn, (agent, customer) in enumerate(turns, 1):
+        if agent:
+            history.append({"role": "agent", "content": agent})
+            monitor.assess_non_customer_message(session, agent, turn=turn)
+        history.append({"role": "customer", "content": customer})
+        results.append(
+            monitor.assess(
+                session,
+                customer,
+                turn=turn,
+                customer_history=[dict(item) for item in history],
+            )
+        )
+    return results
+
+
+def test_emotion_label_always_matches_frustration_intensity():
+    from analysis_core import emotion_label_for_level
+
+    expected = {
+        1: "Calm", 2: "Calm", 3: "Calm",
+        4: "Frustrated", 5: "Frustrated", 6: "Frustrated",
+        7: "Angry", 8: "Angry",
+        9: "Furious", 10: "Furious",
+    }
+    for level, label in expected.items():
+        assert emotion_label_for_level(level) == label
+
+
+def test_mild_negative_message_does_not_collapse_frustration(monitor):
+    results = _conversation(monitor, "s-hold-mild", [
+        (None, "This is unacceptable! I want my refund right now and I "
+               "want to speak to a manager!"),
+        ("I am so sorry for the inconvenience. Thank you for your "
+         "patience, I will check this and confirm soon, please.",
+         "I'm not happy about this. Could you please help me fix the "
+         "refund problem?"),
+    ])
+    first, second = results
+    # A furious 9 must NOT suddenly drop to the mild band.
+    assert first["frustration"] >= 9
+    assert second["frustration"] >= first["frustration"] - 1
+    assert second["emotion"] in ("Furious", "Angry")
+    assert second["sentiment_label"] == "negative"
+    # The agent's apology alone may never lower the customer's risk.
+    assert second["escalation_score"] >= first["escalation_score"]
+    assert second["satisfaction_trend"] in ("declining", "steady")
+
+
+def test_apology_alone_never_lowers_risk(monitor):
+    results = _conversation(monitor, "s-apology", [
+        (None, "My account is locked and nobody has helped me. This is "
+               "ridiculous!"),
+        ("I am so sorry for the inconvenience, thank you for your "
+         "patience, please wait patiently.",
+         "Still locked out and still no help. When will this be "
+         "fixed?"),
+    ])
+    assert results[1]["escalation_score"] >= results[0]["escalation_score"]
+    assert results[1]["trend"] in ("stable", "increasing")
+    assert results[1]["satisfaction_trend"] != "improving"
+
+
+
+
+def test_strong_calming_message_allows_proportional_reduction(monitor):
+    results = _conversation(monitor, "s-calm-down", [
+        (None, "This delay is ridiculous. I have waited long enough and I "
+               "need this delivery issue resolved immediately."),
+        ("I have escalated this and the courier will deliver it within 2 "
+         "business days. You will get a tracking update.",
+         "Okay, I understand. Thank you for the update."),
+        ("The tracking number is 12345 and the delivery date is confirmed.",
+         "Good, thanks. That works for me."),
+    ])
+    assert results[0]["frustration"] == 10
+    # Evidence-backed easing, in steps, not one fixed delta.
+    assert results[1]["frustration"] < results[0]["frustration"]
+    assert results[1]["frustration"] > 3
+    assert results[2]["frustration"] <= results[1]["frustration"]
+    assert results[2]["escalation_score"] < results[0]["escalation_score"]
+    assert results[2]["satisfaction_trend"] in ("improving", "steady")
+    assert results[2]["emotion"] == "Calm"
+
+
+def test_resolved_confirmation_releases_state_and_risk(monitor):
+    results = _conversation(monitor, "s-resolved", [
+        (None, "This payment failure is unacceptable. Fix it immediately "
+               "or escalate it."),
+        ("I have processed the payment fix on our side and it is "
+         "working now.",
+         "Perfect, that's resolved. Thank you so much!"),
+    ])
+    assert results[0]["frustration"] >= 9
+    assert results[1]["frustration"] <= 4
+    assert results[1]["escalation_score"] < 30
+    assert results[1]["trend"] == "decreasing"
+    assert results[1]["satisfaction_trend"] == "improving"
+    assert results[1]["sentiment_label"] == "positive"
+    assert results[1]["emotion"] == "Calm"
+
+
+def test_negated_resolved_is_not_a_resolution(monitor):
+    results = _conversation(monitor, "s-not-resolved", [
+        (None, "This is unacceptable, my refund has not arrived!"),
+        ("Your refund was processed and it is on the way.",
+         "My issue is still not resolved and nobody has helped me."),
+    ])
+    assert results[1]["resolution_status"] != "resolved"
+    assert results[1]["frustration"] >= results[0]["frustration"] - 1
+    assert results[1]["satisfaction_trend"] != "improving"
+
+
+def test_neutral_message_does_not_change_frustration(monitor):
+    results = _conversation(monitor, "s-neutral", [
+        (None, "Hi, I would like to cancel my subscription. Could you "
+               "please help me?"),
+        ("Of course, could you confirm your subscription ID?",
+         "My subscription number is 12345."),
+    ])
+    # A neutral, informative message carries no calming and no
+    # escalation evidence, so the running state is simply held.
+    assert results[1]["frustration"] == results[0]["frustration"]
+    assert results[1]["escalation_score"] == results[0]["escalation_score"]
+    assert results[1]["trend"] == "stable"
+
+
+
+def test_repeated_unresolved_complaint_keeps_pressure(monitor):
+    results = _conversation(monitor, "s-repeat-pressure", [
+        (None, "I want a refund for my order, it never arrived."),
+        ("Let me check that for you.",
+         "I still want my refund, why is this not resolved again?"),
+        ("Please wait patiently.",
+         "Still no refund and nobody has helped me. I have contacted "
+         "support twice already."),
+    ])
+    assert results[-1]["escalation_score"] >= results[0]["escalation_score"]
+    assert results[-1]["satisfaction_trend"] in ("declining", "steady")
+    assert results[-1]["emotion"] in ("Angry", "Furious")
+    assert results[-1]["escalation_level"] in ("Medium", "High", "Critical")
+
+
+def test_state_follows_message_content_not_turn_number(monitor):
+    # Same turn number, different content -> different state.
+    calm = monitor.assess(
+        "s-turn-a", "Thank you, that works perfectly. I appreciate it.",
+        turn=1,
+    )
+    furious = monitor.assess(
+        "s-turn-b", "This is unacceptable and ridiculous! I want a "
+                    "refund immediately!",
+        turn=1,
+    )
+    assert calm["frustration"] < furious["frustration"]
+    assert calm["escalation_score"] < furious["escalation_score"]
+
+    # A furious message at a LATE turn still escalates.
+    late = _conversation(monitor, "s-turn-late", [
+        (None, "Hi, my order is late, please help."),
+        ("I will look into this for you.",
+         "Thanks, I appreciate you checking."),
+        ("Let me check again.",
+         "Still no delivery and nobody has helped me. I want to speak to "
+         "a supervisor immediately!"),
+    ])
+    assert late[-1]["emotion"] == "Furious"
+    assert late[-1]["escalation_score"] > late[0]["escalation_score"]
+    assert late[-1]["trend"] == "increasing"
+    assert late[-1]["satisfaction_trend"] == "declining"

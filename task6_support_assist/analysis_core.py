@@ -9,7 +9,7 @@ Agent always work from the same analysis.
 """
 
 import re
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 
 # ==========================================================
@@ -45,6 +45,44 @@ def detect_intent(text_lower: str) -> str:
         if any(word in text_lower for word in keywords):
             return intent
     return "general_inquiry"
+
+
+# ==========================================================
+# EMOTION BANDS (SINGLE SOURCE OF TRUTH)
+# ==========================================================
+# The emotion LABEL is always a pure function of the frustration
+# intensity, so the UI can never display a label and an intensity that
+# contradict each other (Task 6 requirement: consistency between
+# emotion, emotion intensity and frustration).
+#
+#     1-3  Calm
+#     4-6  Frustrated
+#     7-8  Angry
+#     9-10 Furious
+EMOTION_BANDS: List[Tuple[int, str]] = [
+    (9, "Furious"),
+    (7, "Angry"),
+    (4, "Frustrated"),
+    (1, "Calm"),
+]
+
+
+def emotion_label_for_level(level: int) -> str:
+    """
+    Map a 1..10 frustration intensity to its emotion label.
+
+    Every emotion label produced anywhere in Task 6 (including the
+    history-aware escalation monitor) must come from this function so
+    the label and the intensity always stay consistent.
+    """
+    try:
+        level = int(level)
+    except (TypeError, ValueError):
+        level = 1
+    for minimum, label in EMOTION_BANDS:
+        if level >= minimum:
+            return label
+    return "Calm"
 
 
 # ==========================================================
@@ -131,24 +169,34 @@ def detect_emotion(text_lower: str) -> Tuple[str, int]:
     )
 
     # ---- map to (emotion_label, frustration 1..10) ----
+    # The LABEL always comes from the shared band helper so an emotion
+    # and its intensity can never disagree.
     if escalation_demand:
-        label, frustration = "Furious", 9
+        frustration = 9
     elif severe_hits:
         # Fury vocabulary: 9, or the maximum 10 when the message piles
         # up several fury signals and contains nothing calming.
-        label = "Furious"
         if not calm_hits and (len(severe_hits) >= 3 or intensity >= 12):
             frustration = 10
         else:
             frustration = 9
     elif strong_hits:
-        label, frustration = "Angry", 8 if intensity >= 8 else 7
+        # A politely phrased request whose own calming words fully
+        # offset the complaint vocabulary ("Hi, I would like to cancel
+        # my subscription. Could you please help me?") is a REQUEST,
+        # not anger - so the calm language and the intensity agree.
+        if intensity <= 0:
+            frustration = 5
+        elif intensity >= 8:
+            frustration = 8
+        else:
+            frustration = 7
     elif mild_hits:
-        label, frustration = "Frustrated", 6 if intensity >= 3 else 5
+        frustration = 6 if intensity >= 3 else 5
     else:
-        label, frustration = "Calm", 3
+        frustration = 3
 
-    return label, frustration
+    return emotion_label_for_level(frustration), frustration
 
 
 # ==========================================================

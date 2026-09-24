@@ -330,55 +330,6 @@ def _session_key(session_id: Optional[str], query: str) -> str:
     return f"adhoc-{digest}"
 
 
-def _satisfaction_trend_from_evidence(
-    sentiment_label: str,
-    frustration: int,
-    resolution_status: str,
-    previous: Optional[Dict],
-) -> str:
-    """
-    Satisfaction trend derived ONLY from the customer's actual
-    message + context — never from a fixed per-turn change and never
-    from agent politeness.
-
-    "improving" requires positive customer sentiment or the customer's
-    own confirmation that the issue is resolved (or a clear drop in
-    the customer's own frustration versus their previous message).
-    A negative/urgent message like "I have waited long enough. I need
-    this delivery issue resolved immediately." stays declining or
-    steady — never improving.
-    """
-    if previous is None:
-        return "unknown"
-
-    customer_confirmed = resolution_status == "resolved"
-    prev_frustration = previous.get("frustration")
-    try:
-        prev_frustration = int(prev_frustration) if prev_frustration is not None else None
-    except (TypeError, ValueError):
-        prev_frustration = None
-
-    frustration_evidence = (
-        prev_frustration is not None
-        and frustration < prev_frustration
-        and sentiment_label != "negative"
-    )
-
-    if customer_confirmed or sentiment_label == "positive" or frustration_evidence:
-        return "improving"
-    if sentiment_label == "negative" or frustration >= 6:
-        return "declining"
-    return "steady"
-
-
-SATISFACTION_TREND_MAP = {
-    "increasing": "declining",
-    "decreasing": "improving",
-    "stable": "steady",
-    "first_message": "unknown",
-}
-
-
 @router.post("/support/analyze")
 def support_analyze(req: SupportAssistRequest):
     """
@@ -429,29 +380,36 @@ def support_analyze(req: SupportAssistRequest):
         )
 
     intent = detect_intent(text_lower)
-    emotion, frustration = detect_emotion(text_lower)
-    sentiment = detect_sentiment(text_lower)
+    emotion = ""
+    frustration = 5
+    sentiment = {"label": "neutral", "score": 0.0, "confidence": 0.4}
 
     # ------------------------------------------------------
-    # 2. KNOWLEDGE RECOMMENDATION AGENT (RAG)
+    # 2. ESCALATION RISK MONITOR AGENT (runs FIRST - it is the
+    #    single source of truth for the CUSTOMER state)
     # ------------------------------------------------------
-    knowledge_results = search_knowledge(text, top_k=3, intent=intent)
-
-    # ------------------------------------------------------
-    # 4. ESCALATION RISK MONITOR AGENT
-    #    (stateful - updated after every CUSTOMER message)
-    # ------------------------------------------------------
+    # The monitor re-derives intent / emotion / frustration /
+    # sentiment from the latest CUSTOMER message + the customer's
+    # previous state + customer-only history, then scores the risk.
+    # Every displayed value below comes from this one result, so the
+    # UI can never show two different calculations.
     risk = ESCALATION_MONITOR.assess(
         session_key,
         text,
-        intent=intent,
-        sentiment=sentiment,
-        emotion_label=emotion,
-        frustration_score=frustration,
         turn=req.turn,
         threshold_override=req.threshold,
         customer_history=history,
     )
+
+    intent = risk.get("intent", intent)
+    emotion = risk.get("emotion", emotion)
+    frustration = risk.get("frustration", frustration)
+    sentiment = risk.get("sentiment", sentiment)
+
+    # ------------------------------------------------------
+    # 3. KNOWLEDGE RECOMMENDATION AGENT (RAG)
+    # ------------------------------------------------------
+    knowledge_results = search_knowledge(text, top_k=3, intent=intent)
 
     # ------------------------------------------------------
     # 3. COACHING & RESPONSE SUGGESTION AGENT
@@ -519,7 +477,8 @@ def _build_support_assist_response(
         "history_turns": len(history),
 
         # ---- Intent & Sentiment Analysis Agent ----
-        # ALWAYS the latest CUSTOMER message analysis.
+        # ALWAYS the latest CUSTOMER message analysis, taken from the
+        # escalation monitor's single calculation (never a second one).
         "intent": intent,
         "emotion": emotion,
         "emotion_label": emotion,
@@ -527,15 +486,14 @@ def _build_support_assist_response(
         "customer_emotion": emotion,
         "frustration_level": frustration,
         "frustration_score": frustration,
+        "message_level": risk.get("message_level", frustration),
         "sentiment": sentiment["label"],
         "sentiment_score": sentiment["score"],
         "confidence": sentiment["confidence"],
-        "satisfaction_trend": _satisfaction_trend_from_evidence(
-            sentiment["label"],
-            frustration,
-            risk.get("resolution_status", "unknown"),
-            monitor_state.get("previous_analysis"),
-        ),
+        # Satisfaction trend comes from the SAME evidence as the risk
+        # trend, so the two can never contradict each other.
+        "satisfaction_trend": risk.get("satisfaction_trend", "unknown"),
+        "state_drivers": risk.get("state_drivers", []),
 
         # ---- Escalation Risk Monitor Agent ----
         "escalation_risk": escalation_level,
@@ -545,6 +503,9 @@ def _build_support_assist_response(
         "escalation_trend": risk["trend"],
         "escalation_indicators": risk["indicators"],
         "escalation_reasoning": risk["reasoning"],
+        "de_escalation": risk.get("de_escalation", "none"),
+        "unaddressed_pressure": risk.get("unaddressed_pressure", False),
+        "calm_evidence": risk.get("calm_evidence", []),
         "negative_streak": risk["negative_streak"],
         "alert_threshold": risk["alert"]["threshold"],
         "alert": risk["alert"],

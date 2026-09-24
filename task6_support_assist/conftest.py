@@ -7,6 +7,13 @@ this project. This file makes sure the folder itself is importable no
 matter which directory pytest is started from.
 """
 
+import os
+
+# Task 6 tests must never attempt to download the embedding model or
+# build the FAISS index: knowledge retrieval is optional and degrades
+# to "no results". Fail fast instead.
+os.environ.setdefault("GENCODERS_DISABLE_KNOWLEDGE", "1")
+
 import sys
 from pathlib import Path
 

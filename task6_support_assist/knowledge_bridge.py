@@ -11,10 +11,15 @@ gracefully and returns an empty result list instead of breaking the
 support API.
 """
 
+import os
 import sys
 import threading
 from pathlib import Path
 from typing import Dict, List, Optional
+
+# Tests set TASK6_NO_RAG=1 so the suite never attempts to load the heavy
+# embedding model / FAISS index. Honour it here: retrieval simply returns
+# [] and status reports unavailable. The general pipeline keeps working.
 
 RAG_DIR = Path(__file__).resolve().parent.parent / "rag"
 
@@ -22,6 +27,13 @@ RAG_DIR = Path(__file__).resolve().parent.parent / "rag"
 _lock = threading.Lock()
 _search_fn = None
 _init_error: Optional[str] = None
+
+
+def _rag_disabled() -> bool:
+    """Skip heavy RAG imports in test / lightweight environments."""
+    import os
+
+    return os.getenv("TASK6_NO_RAG", "") not in ("", "0", "false", "False")
 
 
 def _get_search_fn():
@@ -33,8 +45,23 @@ def _get_search_fn():
     """
     global _search_fn, _init_error
 
+    if _rag_disabled():
+        _init_error = "disabled via TASK6_NO_RAG"
+        return None
+
     with _lock:
         if _search_fn is not None or _init_error is not None:
+            return _search_fn
+
+        # Test / offline environments: importing the embedding model can
+        # block for minutes (model download) or fail entirely. Callers
+        # treat an unavailable retriever as "no knowledge results", so
+        # fail fast here instead of hanging a whole pytest run.
+        if os.environ.get("GENCODERS_DISABLE_KNOWLEDGE", "").strip().lower() in (
+            "1", "true", "yes",
+        ):
+            _init_error = "disabled via GENCODERS_DISABLE_KNOWLEDGE"
+            _search_fn = None
             return _search_fn
 
         try:
@@ -56,6 +83,14 @@ def _get_search_fn():
                 vector_db_dir / "metadata.pkl"
             )
 
+            if not (vector_db_dir / "index.faiss").exists():
+                _init_error = (
+                    f"vector index not found: "
+                    f"{vector_db_dir / 'index.faiss'}"
+                )
+                _search_fn = None
+                return _search_fn
+
             from retriever import semantic_search  # noqa: E402
 
             _search_fn = semantic_search
@@ -68,11 +103,20 @@ def _get_search_fn():
 
 def knowledge_available() -> bool:
     """Return True when the RAG retriever could be loaded."""
+    if os.environ.get("TASK6_NO_RAG") == "1":
+        return False
     return _get_search_fn() is not None
 
 
 def knowledge_status() -> Dict:
     """Return a small diagnostic payload about the knowledge agent."""
+    if os.environ.get("TASK6_NO_RAG") == "1":
+        return {
+            "available": False,
+            "error": None,
+            "source": str(RAG_DIR),
+            "disabled": True,
+        }
     return {
         "available": knowledge_available(),
         "error": _init_error,
@@ -258,6 +302,9 @@ def search_knowledge(
     so callers never need to handle knowledge-agent outages.
     """
     if not query or not str(query).strip():
+        return []
+
+    if os.environ.get("TASK6_NO_RAG") == "1":
         return []
 
     search_fn = _get_search_fn()
