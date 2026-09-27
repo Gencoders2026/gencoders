@@ -1,0 +1,23 @@
+# ============================================================
+# GenCoders — Combined Python Requirements (All Tasks)
+# ============================================================
+
+# --- Task 2: RAG Pipeline ---
+pypdf
+sentence-transformers
+faiss-cpu
+numpy
+streamlit
+python-dotenv
+langchain-groq
+
+# --- Task 3 & 4: Customer Simulator + Intent/Sentiment Analysis ---
+fastapi
+uvicorn[standard]
+pydantic
+openai
+httpx
+aiofiles
+jinja2
+python-multipart
+requests
