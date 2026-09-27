@@ -1,0 +1,88 @@
+PAYMENT ISSUES - TROUBLESHOOTING GUIDE
+
+Payment Failed
+
+Problem:
+The customer's payment was declined or did not complete successfully.
+
+Possible Causes:
+
+Insufficient funds.
+Incorrect card details.
+Expired card.
+Bank declined the transaction.
+Payment gateway temporarily unavailable.
+Billing address does not match the card information.
+Transaction was flagged by the bank or payment provider.
+
+Recommended Steps:
+
+Verify the card number, expiration date, and CVV.
+Confirm that sufficient funds are available.
+Try the payment again after a few minutes.
+Try another supported payment method.
+Contact the bank or card issuer if the transaction continues to fail.
+
+If the customer was charged but the order was not completed:
+
+Do not make repeated payments immediately.
+Check the account/order status.
+Allow time for the payment provider to update the transaction.
+Contact customer support with the transaction ID.
+Payment Charged More Than Once
+
+Problem:
+The customer sees multiple charges for the same transaction.
+
+Recommended Steps:
+
+Check whether one of the charges is only a temporary authorization.
+Verify the transaction IDs and timestamps.
+Do not submit another payment.
+Contact support with the payment details.
+
+If duplicate charges are confirmed, the duplicate transaction should be investigated and refunded according to the Refund Policy.
+
+Payment Pending
+
+Problem:
+The payment remains in a pending state.
+
+Recommended Steps:
+
+Wait for the payment provider to complete processing.
+Do not repeatedly submit the same payment.
+Check the order/account status.
+If the payment remains pending for an extended period, contact support.
+Refund Not Received
+
+Problem:
+The customer has been told that a refund was issued but has not received the funds.
+
+Recommended Steps:
+
+Confirm the refund date and amount.
+Verify the original payment method.
+Allow 5–10 business days for normal processing.
+Contact the payment provider if the refund remains missing after the expected processing period.
+Contact support with the original transaction ID if further investigation is required.
+Billing Information Error
+
+Problem:
+The customer's billing information is incorrect.
+
+Recommended Steps:
+
+Update the billing information in the account.
+Verify the billing address with the payment provider.
+Retry the transaction if necessary.
+
+When contacting support, provide:
+
+Customer/account email.
+Transaction or order ID.
+Date and approximate time of payment.
+Payment method used.
+Description of the problem.
+
+Never provide passwords, full card numbers, CVV codes, or other sensitive authentication information to support.
