@@ -29,6 +29,138 @@ from support_assist import (
 
 
 # ==========================================================
+# REGRESSION: a bare escalation NOUN is not an escalation DEMAND
+# ==========================================================
+# A bare "manager" used to force Furious 9/10 and fire the +35
+# supervisor indicator, so "your manager reviewed it, thank you" was
+# scored as an imminent escalation. These lock the fix in place.
+
+
+def test_bare_escalation_noun_is_not_a_demand():
+    assert ac._is_escalation_demand("manager") is False
+    assert ac._is_escalation_demand("supervisor") is False
+    assert ac._is_escalation_demand("a") is False
+
+
+def test_bare_noun_is_not_furious():
+    label, level = ac.detect_emotion("manager")
+    assert label == "Calm"
+    assert level <= 3
+
+
+def test_negated_manager_request_is_not_a_demand():
+    text = "i do not want to speak to a manager, please just fix my order"
+    assert ac._is_escalation_demand(text) is False
+    label, level = ac.detect_emotion(text)
+    assert level < 9, f"negated request scored {level}/10 ({label})"
+
+
+def test_already_handled_manager_is_not_a_demand():
+    text = "the manager reviewed it and sorted it, thank you so much"
+    assert ac._is_escalation_demand(text) is False
+    assert ac.detect_sentiment(text)["label"] == "positive"
+
+
+def test_polite_manager_request_is_not_a_demand():
+    text = "could you please ask your manager to review my refund? thanks"
+    assert ac._is_escalation_demand(text) is False
+
+
+def test_genuine_demands_are_still_demands():
+    for text in (
+        "i demand a supervisor right now",
+        "let me speak to a manager",
+        "get me a manager immediately",
+        "i want to escalate this to a supervisor",
+        "i need a human agent",
+        "escalate this now",
+        "put me through to your supervisor",
+        "i want a manager now",
+    ):
+        assert ac._is_escalation_demand(text) is True, text
+
+
+def test_genuine_demand_is_still_furious():
+    label, level = ac.detect_emotion("i demand a supervisor right now")
+    assert level >= 9
+    assert label == "Furious"
+
+
+def test_monitor_gives_no_supervisor_points_for_a_bare_noun():
+    monitor = EscalationRiskMonitor()
+    result = monitor.assess("bare-noun", "manager")
+    names = [i["name"] for i in result["indicators"]]
+    assert "supervisor_request" not in names
+    assert result["escalation_score"] < 50
+
+
+def test_monitor_gives_supervisor_points_for_a_real_demand():
+    monitor = EscalationRiskMonitor()
+    result = monitor.assess(
+        "real-demand", "i demand a supervisor right now"
+    )
+    names = [i["name"] for i in result["indicators"]]
+    assert "supervisor_request" in names
+    assert result["escalation_score"] >= 50
+
+
+# ==========================================================
+# REGRESSION: a complaint THREAT is negative affect
+# ==========================================================
+# "Nothing changed. I will be posting about this on social media" used
+# to score NEUTRAL, which silently reset the negative streak mid
+# escalation and made the risk DROP while the customer was threatening.
+
+
+def test_nothing_changed_is_negative():
+    assert ac.detect_sentiment("nothing has changed")["label"] == "negative"
+    assert ac.detect_sentiment("nothing changed")["label"] == "negative"
+    assert ac.detect_sentiment("no change at all")["label"] == "negative"
+
+
+def test_reputation_threat_is_negative_affect():
+    text = "i will be posting about this on social media"
+    assert ac.detect_sentiment(text)["label"] == "negative"
+    label, level = ac.detect_emotion(text)
+    assert level >= 5, f"threat scored only {level}/10 ({label})"
+
+
+def test_threat_does_not_reset_the_negative_streak():
+    monitor = EscalationRiskMonitor()
+    session = "threat-streak"
+    monitor.assess(session, "my order is late and nobody has helped me")
+    monitor.assess(session, "this is really frustrating, still not fixed")
+    before = monitor.get_state(session)["negative_streak"]
+    assert before >= 1
+
+    monitor.assess(
+        session,
+        "nothing changed. i will be posting about this on social media",
+    )
+    after = monitor.get_state(session)["negative_streak"]
+    assert after >= before, f"streak dropped {before} -> {after}"
+
+
+def test_risk_does_not_drop_on_a_threat():
+    monitor = EscalationRiskMonitor()
+    session = "threat-risk"
+    scores = []
+    for message in (
+        "my order is late and nobody has helped me",
+        "this is really frustrating, still not fixed",
+        "nothing changed. i will be posting about this on social media",
+    ):
+        result = monitor.assess(session, message)
+        scores.append(result["escalation_score"])
+        print(
+            f"  {result['escalation_score']:3d} "
+            f"frust={result['frustration']} "
+            f"streak={result['negative_streak']} | {message[:48]}"
+        )
+    assert scores[-1] >= scores[-2], f"risk fell on a threat: {scores}"
+
+
+# ==========================================================
 # analysis_core - Intent & Sentiment Analysis
 # ==========================================================
 def test_detect_intent_refund():

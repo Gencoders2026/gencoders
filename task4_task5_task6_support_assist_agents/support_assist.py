@@ -50,6 +50,7 @@ if str(_MODULE_DIR) not in _sys.path:
     _sys.path.insert(0, str(_MODULE_DIR))
 
 from analysis_core import (
+    _is_escalation_demand as ac_is_escalation_demand,
     detect_emotion as ac_detect_emotion,
     detect_intent as ac_detect_intent,
     detect_sentiment as ac_detect_sentiment,
@@ -249,6 +250,11 @@ _UNRESOLVED_MARKERS = (
     "same issue", "same problem", "how long", "when will", "no help",
     "nobody", "no one", "twice", "two times", "waiting", "waited",
     "long enough", "contacted support", "contacted you", "fed up",
+    # "nothing has changed" is how a customer says "still broken".
+    # Without it a threat message carried no unresolved pressure, so the
+    # monitor released risk on a turn where the issue was obviously open.
+    "nothing changed", "nothing has changed", "no change",
+    "nothing has been done", "made no difference", "same as before",
 )
 _REPEAT_MARKERS = (
     "twice", "two times", "three times", "multiple times", "again",
@@ -256,6 +262,13 @@ _REPEAT_MARKERS = (
     "nobody helped", "no one has helped", "still no", "still not",
     "keeps happening", "same issue", "same problem",
 )
+# ESCALATION NOUNS only. These are NOT proof of a demand: a bare
+# "manager", a negated "I do not want to speak to a manager" and a
+# polite "could you ask your manager to review?" must not count. Every
+# use of this tuple is therefore gated on
+# `analysis_core._is_escalation_demand` first - gating only
+# INDICATOR_PATTERNS was not enough, because these markers also drove
+# the emotion target to 9/10 on their own.
 _ESCALATION_DEMAND_MARKERS = (
     "supervisor", "manager", "escalate", "human agent", "real person",
     "someone else", "higher department", "speak to a", "talk to a",
@@ -919,6 +932,11 @@ class EscalationRiskMonitor:
     """
 
     INDICATOR_PATTERNS = {
+        # NOTE: the escalation nouns here are NOT sufficient on their
+        # own. A bare "manager", a negated "I do not want to speak to a
+        # manager" and a polite "could you ask your manager to review?"
+        # are all handled by `_supervisor_request_phrase`, which
+        # requires an actual demand frame. See analysis_core.
         "supervisor_request": (
             35,
             [
@@ -1572,7 +1590,9 @@ class EscalationRiskMonitor:
             p for p in _REPEAT_MARKERS if p in text_lower
         )
         escalation_evidence = sorted(
-            p for p in _ESCALATION_DEMAND_MARKERS if p in text_lower
+            p for p in _ESCALATION_DEMAND_MARKERS
+            # Gated: the nouns alone are not a demand.
+            if p in text_lower and ac_is_escalation_demand(text_lower)
         )
         urgency_evidence = sorted(
             p for p in _URGENCY_MARKERS if p in text_lower
@@ -1874,6 +1894,25 @@ class EscalationRiskMonitor:
     # ------------------------------------------------------
     # Core assessment
     # ------------------------------------------------------
+    @staticmethod
+    def _supervisor_request_phrase(text_lower: str):
+        """
+        The phrase that proves a genuine supervisor/escalation demand,
+        or None when the escalation words are only a bare mention.
+
+        A bare "manager" used to fire the +35 supervisor indicator and
+        force Furious 9/10, which made a calm or satisfied customer look
+        like an imminent escalation. The shared `_is_escalation_demand`
+        helper decides; this only reports WHICH phrase matched so the UI
+        can still explain the score.
+        """
+        if not ac_is_escalation_demand(text_lower):
+            return None
+        _, phrases = EscalationRiskMonitor.INDICATOR_PATTERNS[
+            "supervisor_request"
+        ]
+        return next((p for p in phrases if p in text_lower), "escalation")
+
     def assess(
         self,
         session_key: str,
@@ -2026,9 +2065,13 @@ class EscalationRiskMonitor:
 
         # ---- Phrase-based indicators --------------------------
         for name, (points, phrases) in self.INDICATOR_PATTERNS.items():
-            matched = next(
-                (p for p in phrases if p in text_lower), None
-            )
+            if name == "supervisor_request":
+                # Needs a real DEMAND frame, not just the word.
+                matched = self._supervisor_request_phrase(text_lower)
+            else:
+                matched = next(
+                    (p for p in phrases if p in text_lower), None
+                )
             if matched:
                 _add(name, points, matched, self.INDICATOR_REASONS[name])
 
@@ -2216,13 +2259,9 @@ class EscalationRiskMonitor:
         # A customer who demands a supervisor/escalation while the
         # issue is demonstrably unresolved is escalating, not just
         # venting: add a compound bonus so HIGH/CRITICAL can trigger.
-        explicit_demand = any(
-            phrase in text_lower
-            for phrase in (
-                "supervisor", "manager", "escalate", "human agent",
-                "real person", "someone else",
-            )
-        )
+        # A genuine escalation DEMAND (not a bare mention of the word)
+        # combined with an unresolved issue is a real precursor.
+        explicit_demand = ac_is_escalation_demand(text_lower)
         unresolved_context = (
             any(
                 name == "unresolved_issue" for name in

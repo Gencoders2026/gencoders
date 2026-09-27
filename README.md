@@ -269,13 +269,20 @@ All verification scripts are organized in the `scripts/` directory:
 cd task3_customer_simulator_agent
 python -m pytest test_simulator_replies.py -v
 
-# 2. Run the Task 4/5/6 unit test suite (55 tests)
+# 2. Run the Task 4/5/6 unit test suite (68 tests)
 python -m pytest task4_task5_task6_support_assist_agents -v
 
 # ---- live checks (require the backend on http://127.0.0.1:8000) ----
 
 # 3. Escalation Risk Monitor: 33 behavioural checks
 python scripts/verify_escalation_monitor.py
+
+# 3b. Print the full working of the monitor: score, indicators and
+#     reasoning for every turn of a conversation
+python scripts/prove_escalation_monitor.py
+
+# 3c. Adversarial + edge-case stress test (202 checks)
+python scripts/stress_escalation_monitor.py
 
 # 4. All Task 6 API endpoints respond correctly
 python scripts/verify_support_assist_endpoints.py

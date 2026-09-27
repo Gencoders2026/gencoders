@@ -112,9 +112,14 @@ def detect_emotion(text_lower: str) -> Tuple[str, int]:
     toward Calm.
     """
     # ---- severity vocabulary (each phrase has a weight 1..3) ----
+    # NOTE: the escalation nouns ("manager", "supervisor", "escalate")
+    # are NOT here on purpose. A bare mention of one is not fury, and
+    # weighting them as such made "your manager reviewed it" score as
+    # Furious 9/10. A genuine demand is handled separately by
+    # `_is_escalation_demand` below.
     severe_words = {  # weight 3 - strongest escalation / fury signals
         "furious": 3, "unacceptable": 3, "ridiculous": 3, "worst": 3,
-        "escalate": 3, "supervisor": 3, "manager": 3, "demand": 3,
+        "demand": 3,
         "immediately": 3, "urgent": 3, "urgently": 3, "fed up": 3,
         "never helped": 3, "nobody": 3, "no one": 3, "done waiting": 3,
         "still waiting": 3, "unhappy": 3, "disgusted": 3, "horrible": 3,
@@ -161,11 +166,27 @@ def detect_emotion(text_lower: str) -> Tuple[str, int]:
     )
 
     # Explicit supervisor / escalation / human-agent demand is the
-    # strongest possible signal regardless of word count.
-    escalation_demand = any(
-        w in text_lower for w in
-        ("supervisor", "manager", "escalate", "human agent", "real person",
-         "someone else", "speak to a", "talk to a", "higher department")
+    # strongest possible signal - but ONLY when the customer is
+    # actually ASKING to be escalated to someone.
+    #
+    # A bare mention of the word is NOT a demand. These are all false
+    # positives that this used to read as "furious, escalate now":
+    #   "manager"                                 (a single word)
+    #   "I do not want to speak to a manager"     (negated)
+    #   "your manager reviewed it"                (already handled)
+    #   'he said "I demand a manager"'            (someone else did)
+    #   "Could you ask your manager to review?"   (polite request)
+    # So a demand needs BOTH an escalation noun AND a demand verb /
+    # negated-away form, which is what `_is_escalation_demand` checks.
+    escalation_demand = _is_escalation_demand(text_lower)
+
+    # A public-complaint threat ("I will be posting about this on social
+    # media") is not an escalation demand, but it IS a strong
+    # dissatisfaction signal and must not read as Calm. Without this the
+    # message fell through to the "no vocabulary" branch and scored 3/10
+    # even though the monitor itself raised a +15 reputation indicator.
+    reputation_threat = any(
+        phrase in text_lower for phrase in REPUTATION_PHRASES
     )
 
     # ---- map to (emotion_label, frustration 1..10) ----
@@ -181,12 +202,22 @@ def detect_emotion(text_lower: str) -> Tuple[str, int]:
     # "Frustrated" + sentiment "neutral"), which is exactly what made
     # the legacy /analyze endpoint report escalation_risk="High" for a
     # calm message.
-    negative_substance = any(
-        w in text_lower for w in NEGATIVE_WORDS
-    ) or any(phrase in text_lower for phrase in NEGATIVE_PHRASES)
+    negative_substance = (
+        any(w in text_lower for w in NEGATIVE_WORDS)
+        or any(phrase in text_lower for phrase in NEGATIVE_PHRASES)
+        or any(phrase in text_lower for phrase in REPUTATION_PHRASES)
+        or _is_escalation_demand(text_lower)
+    )
 
     if escalation_demand:
         frustration = 9
+    elif reputation_threat:
+        # A public-complaint threat is real anger (7-8), and reaches 9
+        # when it is stacked with other fury vocabulary.
+        if severe_hits:
+            frustration = 9
+        else:
+            frustration = 7 if not calm_hits else 6
     elif severe_hits:
         # Fury vocabulary: 9, or the maximum 10 when the message piles
         # up several fury signals and contains nothing calming.
@@ -220,6 +251,89 @@ def detect_emotion(text_lower: str) -> Tuple[str, int]:
 
 
 # ==========================================================
+# ESCALATION-DEMAND DETECTION
+# ==========================================================
+
+# Nouns that name WHO the customer wants to be escalated to, plus the
+# bare imperative verb form ("escalate this now", "escalating it").
+_ESCALATION_NOUNS = (
+    "supervisor", "manager", "escalation", "human agent", "real person",
+    "human being", "someone else", "higher department", "senior",
+    "escalate",
+)
+
+# Verbs / frames that turn an escalation noun into an actual DEMAND.
+_ESCALATION_DEMAND_PATTERNS = (
+    r"\b(?:get|give|put|connect|put me)\s+(?:me\s+)?"
+    r"(?:a|an|the|my|to|with|through|on|to talk)?\s*"
+    r"(?:your\s+|the\s+|a\s+)?"
+    r"(?:supervisor|manager|human|real)\b",
+    r"\b(?:speak|talk|chat)\s+to\s+(?:a|an|the|your|my)?\s*"
+    r"(?:supervisor|manager|human|real|senior)\b",
+    r"\b(?:demand|request|insist)\s+(?:a|an|the|to see|to speak to|to "
+    r"talk to)?\s*(?:supervisor|manager|human|real)\b",
+    r"\b(?:put|connect|patch|transfer)\s+me\s+(?:straight\s+)?"
+    r"(?:through|over)?\s*(?:to\s+)?(?:your\s+|the\s+|a\s+)?"
+    r"(?:supervisor|manager|senior|higher)\b",
+    r"\b(?:escalate|escalating|escalation)\b",
+    r"\b(?:want|need|require)\s+(?:a|an|the|to talk to|to speak to)?\s*"
+    r"(?:supervisor|manager|human agent|real person)\b",
+    r"\b(?:supervisor|manager)\s+(?:now|today|asap|urgently|immediately)\b",
+    r"\b(?:higher|senior)\s+(?:department|manager|team|level)\b",
+    r"\blet\s+me\s+speak\s+to\b",
+    r"\bbring\s+me\s+(?:a|an|the)\b",
+)
+
+# Phrases that explicitly REFUSE an escalation. These must never count.
+_ESCALATION_NEGATIONS = (
+    r"\bdo\s+not\s+(?:want|need)\s+(?:to\s+)?(?:speak|talk|see)\b",
+    r"\bdon'?t\s+(?:want|need)\s+(?:to\s+)?(?:speak|talk|see)\b",
+    r"\bno\s+(?:need|point)\s+(?:to\s+)?(?:speak|talk)\s+to\b",
+    r"\bwithout\s+(?:a\s+)?(?:supervisor|manager)\b",
+    r"\bnot\s+(?:a\s+)?(?:supervisor|manager)\s+problem\b",
+    r"\b(?:my|your|the)\s+manager\s+(?:has\s+)?"
+    r"(?:already\s+)?(?:reviewed|approved|handled|sorted|resolved|looked)\b",
+    r"\bmanager\s+(?:has\s+)?(?:reviewed|approved|handled|sorted|resolved)\b",
+)
+
+# "ask your manager to review" is a polite REQUEST, not a demand.
+_ESCALATION_POLITE = (
+    r"\b(?:ask|contact|email|call)\s+(?:your|the|my)\s+"
+    r"(?:supervisor|manager|team|lead)\b",
+    r"\bwould\s+you\s+(?:ask|pass)\b",
+    r"\bif\s+you\s+could\s+(?:ask|check)\b",
+)
+
+
+def _is_escalation_demand(text_lower: str) -> bool:
+    """
+    True only when the CUSTOMER is genuinely demanding an escalation.
+
+    A demand needs an escalation noun AND a demand frame. A bare noun
+    ("manager"), a negated request ("I do not want to speak to a
+    manager"), an already-handled mention ("your manager reviewed it")
+    and a polite request ("could you ask your manager to review?") are
+    all deliberately NOT demands, because treating them as such made a
+    calm, satisfied customer score as Furious 9/10.
+    """
+    if not any(noun in text_lower for noun in _ESCALATION_NOUNS):
+        return False
+
+    for pattern in _ESCALATION_NEGATIONS:
+        if re.search(pattern, text_lower):
+            return False
+
+    for pattern in _ESCALATION_POLITE:
+        if re.search(pattern, text_lower):
+            return False
+
+    return any(
+        re.search(pattern, text_lower)
+        for pattern in _ESCALATION_DEMAND_PATTERNS
+    )
+
+
+# ==========================================================
 # SENTIMENT DETECTION
 # ==========================================================
 NEGATIVE_WORDS = [
@@ -231,9 +345,11 @@ NEGATIVE_WORDS = [
     "pathetic", "poor", "ridiculous", "sad", "slow", "still",
     "terrible", "twice", "unacceptable", "unhappy", "unresolved",
     "upset", "useless", "waiting", "waste", "worst", "wrong",
-    # Escalation / dissatisfaction demand signals (negative affect)
-    "supervisor", "manager", "escalate", "human agent", "real person",
-    "someone else", "demand", "speak to a", "talk to a",
+    # NOTE: the escalation nouns ("manager", "supervisor", "escalate",
+    # ...) are deliberately NOT listed here. A bare mention of them is
+    # not negative affect - "your manager reviewed it" is good news.
+    # They are scored by `_is_escalation_demand` instead, so only a
+    # genuine demand contributes negativity.
     # Intensifiers / negative modifiers: when they appear next to a
     # complaint noun the whole phrase is negative ("very late",
     # "still not working", "really bad"). Without a modifier a bare
@@ -299,9 +415,26 @@ NEGATIVE_PHRASES = [
     "no update", "no updates", "no progress", "no response", "no reply",
     "keeps happening", "same issue", "same problem", "no solution",
     "nothing happened", "waste of time",
+    # "nothing has changed" is the most common way a customer says
+    # "still broken" and was scoring NEUTRAL, which silently reset the
+    # monitor's negative streak mid-escalation.
+    "nothing changed", "nothing has changed", "nothing has been done",
+    "no change", "no changes", "not changed", "nothing new",
+    "made no difference", "no difference", "same as before",
     # unresolved pressure
     "still waiting", "still no", "still not", "still nothing",
     "not helpful", "not good", "not acceptable",
+]
+
+# Reputation / public-complaint threats are negative affect in their own
+# right. Without these, "I will be posting about this on social media"
+# scored NEUTRAL and read as a calmer message than the one before it.
+REPUTATION_PHRASES = [
+    "social media", "twitter", "instagram", "facebook", "trustpilot",
+    "leave a review", "bad review", "one star", "1 star",
+    "tell everyone", "tell the world", "expose you", "go public",
+    "post about this", "posting about this", "write a review",
+    "consumer forum", "consumer court", "consumer protection",
 ]
 
 POSITIVE_WORDS = [
@@ -387,6 +520,19 @@ def detect_sentiment(text_lower: str) -> Dict:
     # above only ever sees single tokens). Each expression counts once.
     negative_hits += sum(
         1 for phrase in NEGATIVE_PHRASES if phrase in text_lower
+    )
+
+    # A genuine escalation demand is negative affect. A bare mention of
+    # the same words is not, so it is scored here rather than being
+    # baked into NEGATIVE_WORDS.
+    if _is_escalation_demand(text_lower):
+        negative_hits += 2
+
+    # A public-complaint threat is negative affect too. Without this,
+    # "I will be posting about this on social media" scored NEUTRAL and
+    # the monitor treated a THREAT as a calmer turn.
+    negative_hits += sum(
+        1 for phrase in REPUTATION_PHRASES if phrase in text_lower
     )
 
     total_hits = negative_hits + positive_hits
