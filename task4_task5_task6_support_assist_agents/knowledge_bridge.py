@@ -1,7 +1,8 @@
 """
 Bridge to the Knowledge Recommendation Agent.
 
-Wraps the FAISS-based RAG retriever that lives in the `rag/` folder so
+Wraps the FAISS-based RAG retriever that lives in the
+`task1_task2_rag_knowledge_base/` folder so
 the support-assistance pipeline (Task 6) can ground its response
 suggestions in the customer-support knowledge base.
 
@@ -38,7 +39,9 @@ _MODULE_DIR = _Path(__file__).resolve().parent
 if str(_MODULE_DIR) not in _sys.path:
     _sys.path.insert(0, str(_MODULE_DIR))
 
-RAG_DIR = Path(__file__).resolve().parent.parent / "rag"
+RAG_DIR = (
+    Path(__file__).resolve().parent.parent / "task1_task2_rag_knowledge_base"
+)
 
 
 # Global lazy-initialisation state
@@ -54,10 +57,11 @@ def _rag_disabled() -> bool:
 
 def _get_search_fn():
     """
-    Lazily import `semantic_search` from the rag package.
+    Lazily import `semantic_search` from the RAG package
+    (`task1_task2_rag_knowledge_base`).
 
-    The rag modules use flat imports (`from embeddings import model`),
-    so the rag folder itself must be on sys.path.
+    The RAG modules use flat imports (`from embeddings import model`),
+    so the RAG folder itself must be on sys.path.
     """
     global _search_fn, _init_error
 
@@ -84,8 +88,8 @@ def _get_search_fn():
             if str(RAG_DIR) not in sys.path:
                 sys.path.insert(0, str(RAG_DIR))
 
-            # The rag vector_store resolves "vector_db" relative to the
-            # current working directory. Pin it to the rag folder so
+            # The RAG vector_store resolves "vector_db" relative to the
+            # current working directory. Pin it to the RAG folder so
             # retrieval works no matter where the API server is
             # started from.
             import vector_store as vector_store_module  # noqa: E402

@@ -4,16 +4,16 @@ Reproduce the Support Console escalation-risk flow turn by turn.
 Runs a real session against the Customer Simulator backend
 (http://127.0.0.1:8000): the customer's message is pushed through
 POST /support/analyze with the full role-tagged history - exactly the
-way frontend/src/pages/SupportConsole.jsx does it - and the resulting
-risk score / level / trend / streak is printed.
+way support_console_frontend/src/pages/SupportConsole.jsx does it - and the
+resulting risk score / level / trend / streak is printed.
 
 The agent reply for each turn is the AI-suggested response
 (`suggested_response`), which is what happens when the user clicks
 "Use this response" in the console.
 
 Usage:
-    python _t6_repro.py                    # frustrated / delayed_order / 7
-    python _t6_repro.py angry refund_request 8
+    python scripts/simulate_console_conversation.py                    # frustrated / delayed_order / 7
+    python scripts/simulate_console_conversation.py angry refund_request 8
 """
 
 import json

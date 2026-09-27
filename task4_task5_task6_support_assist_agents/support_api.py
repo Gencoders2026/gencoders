@@ -1,18 +1,22 @@
 """
-FastAPI layer for the Task 6 support-assistance module.
+FastAPI layer for the Task 4 / 5 / 6 support-assistance module.
 
-Exposes the two Task 6 agents over HTTP:
+Exposes the agents over HTTP:
 
-    1. Coaching & Response Suggestion Agent (support_assist.py)
-    2. Escalation Risk Monitor Agent        (support_assist.py)
+    1. Intent & Sentiment Analysis Agent    (analysis_core.py)     [Task 4]
+    2. Knowledge Recommendation Agent       (knowledge_bridge.py)  [Task 5]
+    3. Coaching & Response Suggestion Agent (support_assist.py)    [Task 6]
+    4. Escalation Risk Monitor Agent        (support_assist.py)    [Task 6]
 
 The same `router` object is used in two ways:
 
     1. Mounted by the Customer Simulator backend
-       (``customer_simulator/api.py``) so the React Support Console
-       keeps talking to a single backend on http://127.0.0.1:8000.
+       (``task3_customer_simulator_agent/api.py``) so the React Support
+       Console keeps talking to a single backend on
+       http://127.0.0.1:8000.
     2. Served standalone by ``run.py`` on http://127.0.0.1:8100 so the
-       Task 6 agents can be run and demonstrated completely on their own.
+       support-assistance agents can be run and demonstrated completely
+       on their own.
 
 Endpoints
 ---------
@@ -36,8 +40,8 @@ from pydantic import BaseModel, Field, model_validator
 # ---------------------------------------------------------------------------
 # Resolve sibling flat imports (analysis_core, support_assist,
 # knowledge_bridge) regardless of how this module is loaded
-# (e.g. `uvicorn task6_support_assist.support_api:app` puts the
-# *package* on sys.path, not the package directory, so a bare
+# (e.g. `uvicorn task4_task5_task6_support_assist_agents.support_api:app`
+# puts the *package* on sys.path, not the package directory, so a bare
 # `from analysis_core import ...` fails with ModuleNotFoundError).
 # Adding this module's own directory makes the flat imports work
 # in every invocation style without duplicating any files.
@@ -630,21 +634,22 @@ _LANDING_PAGE = """<!doctype html>
   </head>
   <body>
     <div class="wrap">
-      <h1>Task 6 - Support Assistance API</h1>
+      <h1>Task 4 / 5 / 6 - Support Assistance API</h1>
       <p class="sub">
-        Coaching &amp; Response Suggestion Agent + Escalation Risk Monitor Agent.
+        Intent &amp; Sentiment Analysis Agent, Knowledge Recommendation Agent,
+        Coaching &amp; Response Suggestion Agent and Escalation Risk Monitor Agent.
         This service is running in <strong>standalone API mode</strong>.
       </p>
 
       <div class="card">
-        <strong>Open the Task 6 interface</strong>
+        <strong>Open the Support Console interface</strong>
         <p>
           The React Support Console (Customer Configuration, conversation,
           AI Analysis and Escalation Risk Monitor) is served by the Customer
           Simulator backend. Start it with:
         </p>
-        <p><code>cd customer_simulator &amp;&amp; python -m uvicorn api:app --host 127.0.0.1 --port 8000</code></p>
-        <a class="btn" href="http://127.0.0.1:8000/">Open Task 6 interface (port 8000)</a>
+        <p><code>cd task3_customer_simulator_agent &amp;&amp; python -m uvicorn api:app --host 127.0.0.1 --port 8000</code></p>
+        <a class="btn" href="http://127.0.0.1:8000/">Open Support Console (port 8000)</a>
         <a class="btn secondary" href="http://localhost:5173/">React dev server (port 5173)</a>
       </div>
 

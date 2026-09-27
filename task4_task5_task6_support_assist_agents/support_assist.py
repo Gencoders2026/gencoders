@@ -1637,6 +1637,28 @@ class EscalationRiskMonitor:
             open_pressure or repeat_history or negative
         )
 
+        # ---- pressure carried by THIS message alone -------------
+        # `unaddressed_pressure` above answers "is the ISSUE still
+        # open?" (true for almost every turn of a long conversation,
+        # because the same intent keeps being raised). That is NOT the
+        # same question as "is the CUSTOMER still pressing in this
+        # message?", which is what must block any release of the
+        # risk/emotion state:
+        #
+        #   * "still no refund, when will this be fixed?"  -> pressing
+        #   * "I'm a bit annoyed, can you check?"          -> milder
+        #   * "Here is my order number: 12345."            -> quieter
+        #
+        # Only the second and third kind of reply may ease the state,
+        # and only proportionally to the evidence they carry. Keeping
+        # the two questions apart is what makes the Escalation Risk
+        # Monitor move with every customer reply instead of freezing
+        # at the highest value reached so far.
+        latest_pressure = bool(
+            open_evidence or unresolved_evidence or repeat_evidence
+            or escalation_evidence or urgency_evidence
+        )
+
         # ---- message-level target (context may only RAISE it) --
         target = message_level
         if escalation_evidence:
@@ -1698,6 +1720,28 @@ class EscalationRiskMonitor:
                 f"Calming evidence ({', '.join(calm_evidence)}) allows a "
                 f"proportional easing {previous_level} -> {level}/10."
             )
+        elif (
+            previous_level >= 7
+            and not negative
+            and not latest_pressure
+            and (previous_level - target) >= 2
+        ):
+            # The running state is HIGH, and this reply is objectively
+            # calmer - no negative wording, no unresolved / repeat /
+            # escalation / urgency markers - even though it does not
+            # contain explicit calming language ("Here is my order
+            # number: 12345."). Release a small, proportional part of
+            # the gap, so a single early outburst cannot pin the
+            # conversation at the top of the scale forever while the
+            # customer is visibly cooperating. The floor is still the
+            # level THIS message justifies (`target`).
+            step = max(1, round((previous_level - target) * 0.35))
+            level = max(target, previous_level - step)
+            drivers.append(
+                "Latest customer message is milder than the running "
+                f"state and carries no new pressure evidence - "
+                f"proportional easing {previous_level} -> {level}/10."
+            )
         else:
             level = previous_level
             pressure_note = (
@@ -1742,6 +1786,7 @@ class EscalationRiskMonitor:
             "urgency_evidence": urgency_evidence,
             "repeat_history": repeat_history,
             "unaddressed_pressure": unaddressed_pressure,
+            "latest_pressure": latest_pressure,
             "de_escalation": de_escalation,
             "drivers": drivers,
         }
@@ -2210,15 +2255,20 @@ class EscalationRiskMonitor:
         #   * fresh score lower WITH strong
         #     de-escalation/resolution evidence in THIS message
         #     -> used as-is (full evidence-based drop)
-        #   * fresh score lower WITH moderate calming evidence
-        #     -> eased proportionally to the gap (never a fixed
-        #     per-turn delta, and only while the issue is open)
-        #   * fresh score lower WITHOUT any improvement evidence
-        #     (message still negative / issue still unresolved /
-        #     no calming language) -> stays at the previous level:
-        #     a milder phrasing alone is not evidence that anything
-        #     got better, and risk must stay consistent with the
-        #     still-high frustration and negative sentiment.
+        #   * fresh score lower WITH calming evidence
+        #     -> released proportionally to the gap (never a fixed
+        #     per-turn delta)
+        #   * fresh score lower because the reply is merely MILDER
+        #     (no calming words, but also no negative wording and no
+        #     unresolved / repeat / escalation / urgency markers) while
+        #     the customer was at a high emotional level
+        #     -> released proportionally with a smaller share: the
+        #     temperature really did drop, so the escalation risk drops
+        #     with it, but nothing has been resolved yet
+        #   * fresh score lower while the reply STILL PRESSES the same
+        #     issue ("still", "again", "when will", a supervisor
+        #     demand, urgency) -> stays at the previous level: nothing
+        #     has improved, so the risk must not fall.
         # Agent replies never reach this method, so an agent
         # apology alone can never move the risk. Direction and size
         # of every change come from the message content, never from
@@ -2227,6 +2277,17 @@ class EscalationRiskMonitor:
             state["assessments"][-1]["score"]
             if state["assessments"] else None
         )
+        # Running CUSTOMER state before this message (used by the
+        # release tiers below: only a clearly-high state may release
+        # points on a merely-milder reply).
+        previous_analysis = state.get("last_analysis") or {}
+        try:
+            previous_frustration = int(previous_analysis.get("frustration"))
+        except (TypeError, ValueError):
+            previous_frustration = None
+        if previous_frustration is not None and not 1 <= previous_frustration <= 10:
+            previous_frustration = None
+
         score = clamp_score(score)
 
         if previous is None:
@@ -2239,47 +2300,80 @@ class EscalationRiskMonitor:
                 f"Risk recalculated {previous} -> {score}/100: this "
                 "customer message adds escalation evidence in context."
             )
-        elif score < previous and (
-            de_escalation == "strong" or resolved_now
-        ):
-            resolution_evidence = ", ".join(
-                resolution.get("evidence") or []
-            )
-            drop_evidence = (
-                ", ".join(calm_evidence)
-                or resolution_evidence
-                or "positive, pressure-free language"
-            )
-            reasoning.append(
-                f"Risk recalculated {previous} -> {score}/100: the "
-                "latest customer message shows genuine de-escalation "
-                f"evidence ({drop_evidence})."
-            )
-        elif score < previous and de_escalation == "moderate":
-            step = max(1, round((previous - score) * 0.4))
-            score = max(score, previous - step)
-            reasoning.append(
-                f"Risk eased {previous} -> {score}/100: calming "
-                "evidence in this customer message lowers pressure, "
-                "but the issue is not confirmed resolved yet "
-                f"({', '.join(calm_evidence) or 'calming language'})."
-            )
         elif score < previous:
-            # Recalculated fresh - and the fresh evidence shows no
-            # improvement, so the lower number only reflects milder
-            # phrasing, not a better situation.
-            score = previous
-            pressure_note = (
-                "issue still negative/unresolved"
-                if unaddressed_pressure or sentiment_label == "negative"
-                else "no de-escalation evidence"
+            # ---- Evidence-graded release (this is what makes the
+            # ---- Escalation Risk Monitor MOVE with every reply) -----
+            # The fresh evidence is LIGHTER than the running state.
+            # HOW MUCH may be released follows the evidence in THIS
+            # message - never a fixed per-turn delta:
+            #   strong   : resolution confirmed / clearly positive and
+            #              pressure-free              -> full drop
+            #   calming  : explicit calming language (thanks /
+            #              understanding / positive words) in a message
+            #              that adds no new pressure -> part of the gap
+            #   milder   : no calming words, but no pressure markers
+            #              either, while the customer was at a HIGH
+            #              emotional level         -> smaller part
+            #   pressing : the reply still carries unresolved / repeat /
+            #              escalation / urgent wording -> HELD
+            latest_pressure = bool(analysis.get("latest_pressure", True))
+            message_level = int(
+                analysis.get("message_level", frustration_score) or 0
             )
-            reasoning.append(
-                f"Risk recalculated at {score}/100 with no lowering "
-                f"evidence in this message ({pressure_note}): risk "
-                "falls only when the customer's reply shows genuine "
-                "improvement."
-            )
+            calming_strength = float(analysis.get("calming_strength", 0.0))
+            if de_escalation == "strong" or resolved_now:
+                share, tier = 1.0, "strong"
+            elif calming_strength >= 0.5:
+                share, tier = 0.5, "calming"
+            elif calming_strength >= 0.15:
+                share, tier = 0.4, "calming"
+            elif (
+                not latest_pressure
+                and previous_frustration is not None
+                and previous_frustration >= 7
+                and (previous_frustration - message_level) >= 2
+            ):
+                share, tier = 0.3, "milder"
+            else:
+                share, tier = 0.0, "pressing"
+
+            if share <= 0.0:
+                score = previous
+                reasoning.append(
+                    f"Risk held at {score}/100: this customer message "
+                    "still presses the same issue (unresolved / repeat / "
+                    "escalation / urgency wording), so there is no "
+                    "de-escalation evidence to release risk."
+                )
+            elif tier == "strong":
+                resolution_evidence = ", ".join(
+                    resolution.get("evidence") or []
+                )
+                drop_evidence = (
+                    ", ".join(calm_evidence)
+                    or resolution_evidence
+                    or "positive, pressure-free language"
+                )
+                reasoning.append(
+                    f"Risk recalculated {previous} -> {score}/100: the "
+                    "latest customer message shows genuine de-escalation "
+                    f"evidence ({drop_evidence})."
+                )
+            else:
+                step = max(1, round((previous - score) * share))
+                score = max(score, previous - step)
+                evidence_note = (
+                    ", ".join(calm_evidence) or "calming language"
+                    if tier == "calming"
+                    else "no pressure markers and a clearly milder wording"
+                )
+                reasoning.append(
+                    f"Risk eased {previous} -> {score}/100: the latest "
+                    f"customer message is calmer ({evidence_note}), so "
+                    f"{int(share * 100)}% of the gap to the fresh evidence "
+                    "was released - risk keeps tracking the customer's "
+                    "tone instead of staying frozen."
+                )
         else:
             reasoning.append(
                 f"Risk recalculated at {score}/100: this customer "
@@ -2421,6 +2515,7 @@ class EscalationRiskMonitor:
             "de_escalation": de_escalation,
             "calm_evidence": calm_evidence,
             "unaddressed_pressure": unaddressed_pressure,
+            "latest_pressure": analysis["latest_pressure"],
             "state_drivers": state_drivers,
             "satisfaction_trend": satisfaction_trend,
         }

@@ -739,7 +739,22 @@ def test_emotion_label_always_matches_frustration_intensity():
         assert emotion_label_for_level(level) == label
 
 
-def test_mild_negative_message_does_not_collapse_frustration(monitor):
+def test_mild_negative_reply_eases_risk_without_collapsing(monitor):
+    """A milder (but still negative) reply RELEASES risk proportionally.
+
+    Contract of the Escalation Risk Monitor (Task 6):
+    * the score is recomputed from EVERY customer reply, so a calmer
+      reply must move it down instead of freezing the session at the
+      highest value reached so far;
+    * a merely milder reply is NOT proof that anything was resolved, so
+      only a small share of the gap may be released and the score can
+      never collapse into the Low band while the wording is still
+      negative and the issue is still open;
+    * the running frustration / emotion is HELD (the customer did not
+      confirm any improvement), so the UI never shows a calm customer
+      together with an unresolved complaint;
+    * the change is explained in the reasoning - never silent.
+    """
     results = _conversation(monitor, "s-hold-mild", [
         (None, "This is unacceptable! I want my refund right now and I "
                "want to speak to a manager!"),
@@ -754,9 +769,64 @@ def test_mild_negative_message_does_not_collapse_frustration(monitor):
     assert second["frustration"] >= first["frustration"] - 1
     assert second["emotion"] in ("Furious", "Angry")
     assert second["sentiment_label"] == "negative"
-    # The agent's apology alone may never lower the customer's risk.
-    assert second["escalation_score"] >= first["escalation_score"]
-    assert second["satisfaction_trend"] in ("declining", "steady")
+    # The risk MOVES with the calmer reply ...
+    assert second["escalation_score"] < first["escalation_score"]
+    assert second["trend"] == "decreasing"
+    # ... proportionally: at most a small share of the gap is released,
+    # so the conversation stays in an escalation band (never Low) while
+    # the customer is still negative about an open issue.
+    assert second["escalation_score"] >= first["escalation_score"] * 0.5
+    assert second["escalation_level"] != "Low"
+    assert any("eased" in line.lower() for line in second["reasoning"])
+
+
+def test_risk_moves_in_both_directions_with_every_reply(monitor):
+    """End-to-end movement contract of the monitor.
+
+    Realistic conversation: furious -> mildly annoyed -> neutral
+    information -> appreciative -> resolved -> furious again. The score
+    must follow the customer's tone in BOTH directions on every single
+    reply (this is what the Support Console displays).
+    """
+    results = _conversation(monitor, "s-moves-both-ways", [
+        (None, "This is absolutely unacceptable and ridiculous! I demand "
+               "a supervisor!"),
+        (_AGENT_ACK, "I'm a bit annoyed that my order is late. Can you "
+                     "check?"),
+        (_AGENT_ACK, "My order number is 12345."),
+        (_AGENT_ACK, "Okay, I understand. Thank you for checking, I "
+                     "appreciate the help."),
+        (_AGENT_ACK, "Perfect, that's resolved. Thank you so much!"),
+        (_AGENT_ACK, "Still nothing resolved! Nobody has helped me! Get "
+                     "me a manager NOW!"),
+    ])
+    scores = [result["escalation_score"] for result in results]
+
+    # 1) furious opening
+    assert scores[0] >= 50
+    # 2) mildly annoyed -> risk released (but the customer is still
+    #    negative, so the emotion is held)
+    assert scores[1] < scores[0]
+    assert results[1]["trend"] == "decreasing"
+    assert results[1]["emotion"] in ("Furious", "Angry")
+    # 3) neutral informative reply -> released again
+    assert scores[2] < scores[1]
+    assert results[2]["trend"] == "decreasing"
+    # 4) appreciative reply -> clear calming evidence, big release
+    assert scores[3] < scores[2]
+    assert scores[3] < 25
+    assert results[3]["escalation_level"] == "Low"
+    # 5) confirmed resolution -> stays at the bottom
+    assert scores[4] <= scores[3]
+    # 6) furious again -> immediate rise, alert fires
+    assert scores[5] > scores[4]
+    assert results[5]["trend"] == "increasing"
+    assert results[5]["escalation_level"] in ("High", "Critical")
+    assert results[5]["alert"]["triggered"] is True
+    # Agent replies never moved the customer state on their own.
+    assert [r["message_count"] for r in results] == [1, 2, 3, 4, 5, 6]
+    # Five distinct directions were reported, nothing was frozen.
+    assert len({s for s in scores}) >= 4
 
 
 def test_apology_alone_never_lowers_risk(monitor):

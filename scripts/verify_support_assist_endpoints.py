@@ -1,9 +1,9 @@
-"""Live check of the running Task 6 backend (port 8000).
+"""Live check of the running Task 4/5/6 backend (port 8000).
 
-Exercises every Task 6 endpoint the Support Console UI calls and prints a
+Exercises every endpoint the Support Console UI calls and prints a
 compact summary. Run while the backend is up:
 
-    python _t6_live_check.py
+    python scripts/verify_support_assist_endpoints.py
 """
 
 import json

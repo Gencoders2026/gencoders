@@ -1,11 +1,12 @@
 """
-FastAPI server for Customer Simulator.
+FastAPI server for the Customer Simulator Agent (Task 3).
 
-Task 6 note: the Coaching & Response Suggestion Agent and the
+Task 4/5/6 note: the Intent & Sentiment Analysis Agent, the Knowledge
+Recommendation Agent, the Coaching & Response Suggestion Agent and the
 Escalation Risk Monitor Agent live in their own module folder
-(`task6_support_assist/`) and expose a shared FastAPI router. That
-router is mounted below, so the React Support Console keeps talking to
-a single backend on port 8000.
+(`task4_task5_task6_support_assist_agents/`) and expose a shared FastAPI
+router. That router is mounted below, so the React Support Console keeps
+talking to a single backend on port 8000.
 """
 
 import os
@@ -36,23 +37,25 @@ from simulator import (
 
 BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 ROOT_DIR = BASE_DIR.parent
-# The React Task 6 UI is built into `frontend/dist`. Serve THAT as the
-# root page so the browser gets the working Support Console (with the
-# escalation risk monitor, coaching panel, emotion/frustration state,
-# etc.) instead of the old static HTML page.
-REACT_DIST_DIR = ROOT_DIR / "frontend" / "dist"
-FRONTEND_DIR = BASE_DIR / "frontend"
+# The React Support Console (Task 3 + 4 + 5 + 6 UI) is built into
+# `support_console_frontend/dist`. Serve THAT as the root page so the
+# browser gets the working Support Console (with the escalation risk
+# monitor, coaching panel, emotion/frustration state, etc.) instead of
+# the legacy static HTML prototype (now archived under
+# `archive/legacy_static_ui_prototype/`).
+REACT_DIST_DIR = ROOT_DIR / "support_console_frontend" / "dist"
 INDEX_PATH = REACT_DIST_DIR / "index.html"
 LOG_DIR = BASE_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
 
 # ==========================================================
-# TASK 6 - SUPPORT ASSISTANCE MODULE (separate folder)
+# TASK 4 / 5 / 6 - SUPPORT ASSISTANCE MODULE (separate folder)
 # ==========================================================
-# task6_support_assist/support_api.py exposes the shared router with
-# /support/analyze, /coaching/evaluate, /escalation/... and /analyze.
-TASK6_DIR = ROOT_DIR / "task6_support_assist"
+# task4_task5_task6_support_assist_agents/support_api.py exposes the
+# shared router with /support/analyze, /coaching/evaluate,
+# /escalation/... and /analyze.
+TASK6_DIR = ROOT_DIR / "task4_task5_task6_support_assist_agents"
 task6_router = None
 
 if TASK6_DIR.exists():
@@ -69,9 +72,10 @@ app = FastAPI(
     version="2.0"
 )
 
-# Mount the Task 6 support-assistance endpoints on this backend too, so
-# the Support Console UI can use one base URL (http://127.0.0.1:8000).
-# The Task 6 service can also run on its own: task6_support_assist/run.py
+# Mount the Task 4/5/6 support-assistance endpoints on this backend too,
+# so the Support Console UI can use one base URL
+# (http://127.0.0.1:8000). The support-assistance service can also run on
+# its own: task4_task5_task6_support_assist_agents/run.py
 if task6_router is not None:
     app.include_router(task6_router)
 
@@ -133,14 +137,14 @@ def wants_html(request: Request) -> bool:
 
 
 def spa_index() -> FileResponse:
-    """Serve the built React Task 6 UI (SPA entry point)."""
+    """Serve the built React Support Console (SPA entry point)."""
     if INDEX_PATH.exists():
         return FileResponse(INDEX_PATH)
     raise HTTPException(
         status_code=404,
         detail=(
-            "Task 6 UI not built. Run `npm run build` inside the "
-            "`frontend` folder."
+            "Support Console UI not built. Run `npm run build` inside the "
+            "`support_console_frontend` folder."
         ),
     )
 

@@ -7,9 +7,10 @@ __pycache__/
 .env
 
 # Generated session logs
-customer_simulator/logs/
+task3_customer_simulator_agent/logs/
 logs/
-manasa_test/customer_simulator/logs
+archive/reference_copy_before_merge/task3_customer_simulator_agent/logs
+archive/reference_copy_before_merge/customer_simulator/logs
 vector_db/
 
 # OS / editor
@@ -20,7 +21,13 @@ vector_db/
 # Node / frontend dependencies
 node_modules/
 .next/
+
+# Build output: the React Support Console build (support_console_frontend/dist)
+# IS committed on purpose, so the FastAPI backend can serve the UI without a
+# build step. Every other `dist/` folder stays ignored.
 dist/
+!support_console_frontend/dist/
+!support_console_frontend/dist/**
 
 # Task 6 - local run artifacts
 uvicorn_out.log

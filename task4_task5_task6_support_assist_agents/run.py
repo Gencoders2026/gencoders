@@ -1,12 +1,12 @@
 """
-Run the Task 6 support-assistance API standalone.
+Run the Task 4/5/6 support-assistance API standalone.
 
-    cd task6_support_assist
+    cd task4_task5_task6_support_assist_agents
     python run.py            # -> http://127.0.0.1:8100/docs
 
 The Customer Simulator backend (http://127.0.0.1:8000) mounts the very
 same routes, so this script is only needed when you want to run and
-demonstrate the Task 6 agents without the customer simulator.
+demonstrate the support-assistance agents without the customer simulator.
 
 Environment variables (all optional):
 
