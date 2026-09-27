@@ -1,18 +1,66 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { startSession } from "../services/sessionService";
+import {
+  startSession,
+  readStoredConfig,
+  getConfigOptions,
+} from "../services/sessionService";
+
+// Values the customer simulator always understands; used until (or if)
+// `GET /config/options` answers.
+const FALLBACK_CONFIG_OPTIONS = {
+  personas: [
+    { value: "polite", name: "Polite Customer" },
+    { value: "concerned", name: "Concerned Customer" },
+    { value: "frustrated", name: "Frustrated Customer" },
+    { value: "angry", name: "Angry Customer" },
+    { value: "furious", name: "Furious Customer" },
+  ],
+  scenarios: [
+    { value: "refund_request", name: "Refund Request" },
+    { value: "delayed_order", name: "Delayed Order" },
+    { value: "payment_failure", name: "Payment Failure" },
+    { value: "account_issue", name: "Account Access Issue" },
+    { value: "cancellation", name: "Cancellation Request" },
+  ],
+};
 
 function SessionConfiguration() {
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({
-    mode: "simulator",
-    persona: "frustrated",
-    scenario: "delayed_order",
-    initial_emotion: "frustrated",
-    severity: "medium",
-    patience: 5,
-  });
+  // Pre-filled with the last Customer Configuration used (defaults on the
+  // first run) so the Task 6 session always starts from a valid setup.
+  const [form, setForm] = useState(() => readStoredConfig());
+
+  // Personas / scenarios are loaded from the backend so only options the
+  // simulator can actually run are offered (a hardcoded "Calm Customer"
+  // used to be sent to the backend and failed).
+  const [configOptions, setConfigOptions] = useState(
+    FALLBACK_CONFIG_OPTIONS
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getConfigOptions().then((options) => {
+      if (cancelled || !options) {
+        return;
+      }
+
+      setConfigOptions({
+        personas: options.personas?.length
+          ? options.personas
+          : FALLBACK_CONFIG_OPTIONS.personas,
+        scenarios: options.scenarios?.length
+          ? options.scenarios
+          : FALLBACK_CONFIG_OPTIONS.scenarios,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -227,23 +275,14 @@ function SessionConfiguration() {
                   value={form.persona}
                   onChange={handleChange}
                 >
-
-                  <option value="frustrated">
-                    Frustrated Customer
-                  </option>
-
-                  <option value="calm">
-                    Calm Customer
-                  </option>
-
-                  <option value="impatient">
-                    Impatient Customer
-                  </option>
-
-                  <option value="angry">
-                    Angry Customer
-                  </option>
-
+                  {configOptions.personas.map((persona) => (
+                    <option
+                      key={persona.value}
+                      value={persona.value}
+                    >
+                      {persona.name}
+                    </option>
+                  ))}
                 </select>
 
               </div>
@@ -260,23 +299,14 @@ function SessionConfiguration() {
                   value={form.scenario}
                   onChange={handleChange}
                 >
-
-                  <option value="delayed_order">
-                    Delayed Order
-                  </option>
-
-                  <option value="refund_request">
-                    Refund Request
-                  </option>
-
-                  <option value="payment_issue">
-                    Payment Issue
-                  </option>
-
-                  <option value="account_login">
-                    Account Login
-                  </option>
-
+                  {configOptions.scenarios.map((scenario) => (
+                    <option
+                      key={scenario.value}
+                      value={scenario.value}
+                    >
+                      {scenario.name}
+                    </option>
+                  ))}
                 </select>
 
               </div>

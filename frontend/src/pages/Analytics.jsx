@@ -1,37 +1,38 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+
+function getInitialStoredSessions() {
+  const storedSessions = [];
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+
+    if (key && key.startsWith("supportai_session_")) {
+      try {
+        const session = JSON.parse(
+          localStorage.getItem(key)
+        );
+
+        if (session) {
+          storedSessions.push(session);
+        }
+      } catch (error) {
+        console.error(
+          "Unable to read stored session:",
+          error
+        );
+      }
+    }
+  }
+
+  return storedSessions;
+}
 
 function Analytics() {
   const navigate = useNavigate();
 
-  const [sessions, setSessions] = useState([]);
+  const [sessions] = useState(getInitialStoredSessions);
 
-  useEffect(() => {
-    const storedSessions = [];
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-
-      if (key && key.startsWith("supportai_session_")) {
-        try {
-          const session = JSON.parse(
-            localStorage.getItem(key)
-          );
-
-          if (session) {
-            storedSessions.push(session);
-          }
-        } catch (error) {
-          console.error(
-            "Unable to read stored session:",
-            error
-          );
-        }
-      }
-    }
-
-    setSessions(storedSessions);
-  }, []);
 
   const getMeta = (session) => session?.meta || {};
 

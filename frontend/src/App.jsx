@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Dashboard from "./pages/Dashboard";
+import SessionAutoStart from "./pages/SessionAutoStart";
 import SessionConfiguration from "./pages/SessionConfiguration";
 import SupportConsole from "./pages/SupportConsole";
 import SessionResult from "./pages/SessionResult";
@@ -11,18 +12,25 @@ function App() {
     <BrowserRouter>
       <Routes>
 
-        {/* Opening the project lands directly on the Task 6 Customer
-            Configuration screen (persona / scenario / initial emotion /
-            severity / patience). No manual URL or session ID typing. */}
-        <Route path="/" element={<Navigate to="/session/new" replace />} />
+        {/* Opening the project lands directly on the Task 6 interface.
+            `SessionAutoStart` resumes the conversation of this tab when
+            there is one, otherwise it creates a session automatically
+            (with the last Customer Configuration) and opens the console -
+            no internal URL or session id has to be typed. */}
+        <Route path="/" element={<SessionAutoStart />} />
 
         <Route path="/dashboard" element={<Dashboard />} />
 
+        {/* Full Customer Configuration screen (persona / scenario /
+            initial emotion / severity / patience). */}
         <Route
           path="/session/new"
           element={<SessionConfiguration />}
         />
 
+        {/* Task 6 conversation interface + AI Analysis + Escalation Risk
+            Monitor. The configuration panel lives inside this screen too,
+            so the whole dashboard is visible at once. */}
         <Route
           path="/session/:sessionId"
           element={<SupportConsole />}

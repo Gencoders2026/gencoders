@@ -14,9 +14,9 @@ import json
 from pathlib import Path
 from typing import Dict, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -120,16 +120,37 @@ class FrustrationRequest(BaseModel):
 # `dist` folder. A catch-all route is added below so the React Router's
 # client-side routes (e.g. `/session/<id>`) keep working after a browser
 # refresh instead of hitting a 404.
+def wants_html(request: Request) -> bool:
+    """True for a real browser navigation (SPA route), not an API call.
+
+    Browsers send `Accept: text/html,application/xhtml+xml,...`, while
+    `fetch`/`axios`/`requests`/`urllib` clients send `application/json` or
+    `*/*`. This distinction is what lets `/session/<id>` serve the React
+    app to the browser and JSON to the API.
+    """
+    accept = (request.headers.get("accept") or "").lower()
+    return "text/html" in accept
+
+
+def spa_index() -> FileResponse:
+    """Serve the built React Task 6 UI (SPA entry point)."""
+    if INDEX_PATH.exists():
+        return FileResponse(INDEX_PATH)
+    raise HTTPException(
+        status_code=404,
+        detail=(
+            "Task 6 UI not built. Run `npm run build` inside the "
+            "`frontend` folder."
+        ),
+    )
+
+
 @app.get("/")
 @app.get("/ui")
 @app.get("/ui/")
 async def home():
-    if INDEX_PATH.exists():
-        return FileResponse(INDEX_PATH)
-    return HTMLResponse(
-        "<h1>Task 6 UI not built. Run `npm run build` in the frontend folder.</h1>",
-        status_code=404
-    )
+    return spa_index()
+
 
 
 # Serve the built JS/CSS bundle from the dist folder. Mounting at
@@ -266,13 +287,27 @@ def update_frustration(session_id: str, req: FrustrationRequest):
 # "new" as a session id and 404).
 @app.get("/session/new")
 async def session_new():
-    if INDEX_PATH.exists():
-        return FileResponse(INDEX_PATH)
-    raise HTTPException(status_code=404, detail="Not found")
+    return spa_index()
 
 
 @app.get("/session/{session_id}")
-def get_session(session_id: str):
+def get_session(session_id: str, request: Request):
+    # ------------------------------------------------------
+    # IMPORTANT (Task 6 UI routing)
+    # ------------------------------------------------------
+    # `/session/<id>` is BOTH an API endpoint and a React Router
+    # client-side route (the Support Console / Task 6 conversation
+    # interface). A browser navigation - opening the URL directly or
+    # hitting refresh - must receive the built React app, otherwise the
+    # user sees a raw JSON dump instead of the interface (which looked
+    # like a "code screen"/broken page).
+    #
+    # Browsers send `Accept: text/html,...`; API clients (axios, requests,
+    # urllib) send `application/json` or `*/*`. So the SPA is served only
+    # for real browser navigations and the JSON state is kept for the API.
+    if wants_html(request):
+        return spa_index()
+
     sim = SESSIONS.get(session_id)
     if not sim:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -343,10 +378,7 @@ async def spa_fallback(full_path: str):
     # `/session/new`). Real API endpoints (defined above this
     # catch-all) are matched first by Starlette, so they are never
     # intercepted here.
-    if INDEX_PATH.exists():
-        return FileResponse(INDEX_PATH)
-
-    raise HTTPException(status_code=404, detail="Not found")
+    return spa_index()
 
 
 # ==========================================================

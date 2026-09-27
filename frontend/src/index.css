@@ -1717,3 +1717,168 @@
   color: #9ca3af;
   line-height: 1.5;
 }
+
+/* =========================================================
+   TASK 6 - CUSTOMER CONFIGURATION ON THE DASHBOARD
+========================================================= */
+
+.customer-config-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  padding: 20px 22px;
+  margin-bottom: 22px;
+}
+
+.customer-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.customer-config-header h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: #111827;
+}
+
+.customer-config-header p {
+  margin: 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.customer-config-active {
+  white-space: nowrap;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.customer-config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px 18px;
+  align-items: end;
+}
+
+.customer-config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #374151;
+  font-weight: 600;
+}
+
+.customer-config-field select {
+  padding: 9px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #111827;
+  background: white;
+  font-weight: 400;
+}
+
+.customer-config-patience {
+  grid-column: span 1;
+}
+
+.customer-config-patience input[type="range"] {
+  width: 100%;
+  accent-color: #2563eb;
+}
+
+.customer-config-patience .slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 400;
+  color: #9ca3af;
+}
+
+.customer-config-submit {
+  justify-content: flex-end;
+}
+
+.customer-config-submit .primary-button {
+  width: 100%;
+  padding: 11px 16px;
+}
+
+.customer-config-card .error-message {
+  margin-top: 14px;
+}
+
+/* =========================================================
+   TASK 6 - ANALYSIS UNAVAILABLE / RETRY
+========================================================= */
+
+.analysis-unavailable {
+  padding: 14px;
+  border: 1px dashed #f59e0b;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.analysis-unavailable p {
+  margin: 0 0 8px;
+}
+
+.analysis-unavailable-note {
+  color: #b45309;
+  font-size: 12px;
+}
+
+.retry-analysis-button {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 7px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.retry-analysis-button:hover {
+  background: #1d4ed8;
+}
+
+/* =========================================================
+   TASK 6 - STARTUP / SETUP HELPERS
+========================================================= */
+
+.setup-hint {
+  margin: 14px 0 6px;
+  color: #374151;
+  font-size: 14px;
+}
+
+.setup-command {
+  margin: 0;
+  padding: 12px 14px;
+  background: #111827;
+  color: #e5e7eb;
+  border-radius: 10px;
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+@media (max-width: 700px) {
+  .customer-config-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

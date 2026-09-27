@@ -24,7 +24,7 @@ function SessionResult() {
         // First try the active session endpoint.
         try {
           data = await getSession(sessionId);
-        } catch (sessionError) {
+        } catch {
           // Completed sessions are removed from active memory.
           // Therefore, load the persisted session log.
           console.log(

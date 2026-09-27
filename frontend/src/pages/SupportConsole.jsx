@@ -6,6 +6,11 @@ import {
   getSessionLog,
   sendMessage,
   endSession,
+  startSession,
+  getConfigOptions,
+  readStoredConfig,
+  storeSessionId,
+  clearStoredSessionId,
 } from "../services/sessionService";
 
 import {
@@ -14,6 +19,253 @@ import {
   getEscalationThreshold,
   setEscalationThreshold,
 } from "../services/supportAssistService";
+
+// Fallback Customer Configuration choices. The backend's
+// `GET /config/options` is preferred; these keep every dropdown usable if
+// that request ever fails. The values must match the simulator's own keys.
+const FALLBACK_CONFIG_OPTIONS = {
+  personas: [
+    { value: "polite", name: "Polite Customer" },
+    { value: "concerned", name: "Concerned Customer" },
+    { value: "frustrated", name: "Frustrated Customer" },
+    { value: "angry", name: "Angry Customer" },
+    { value: "furious", name: "Furious Customer" },
+  ],
+  scenarios: [
+    { value: "refund_request", name: "Refund Request" },
+    { value: "delayed_order", name: "Delayed Order" },
+    { value: "payment_failure", name: "Payment Failure" },
+    { value: "account_issue", name: "Account Access Issue" },
+    { value: "cancellation", name: "Cancellation Request" },
+  ],
+};
+
+const INITIAL_EMOTIONS = ["frustrated", "neutral", "angry", "worried"];
+const SEVERITIES = ["low", "medium", "high"];
+
+/**
+ * Recalculate the customer state from the latest CUSTOMER message of a
+ * conversation - the single source of truth for every displayed value
+ * (intent, emotion, sentiment, frustration, satisfaction trend,
+ * escalation risk, negative streak, risk score and risk reasoning).
+ *
+ * `history` must be the role-tagged conversation (customer + agent). The
+ * full history is sent to the backend so repeat/streak signals and the
+ * escalation risk are always evaluated against the previous conversation
+ * and the current customer state - never against the agent's own wording.
+ */
+async function analyseConversation(history, sessionId, requestRef, actions) {
+  const { setLoading, setResult, setError } = actions || {};
+
+  const messages = (history || []).filter(
+    (item) => item && item.role && String(item.content || "").trim()
+  );
+
+  const latestCustomerMessage = [...messages]
+    .reverse()
+    .find((item) => item.role === "customer");
+
+  if (!latestCustomerMessage?.content) {
+    if (setLoading) setLoading(false);
+    return null;
+  }
+
+  const customerTurn =
+    messages.filter((item) => item.role === "customer").length || 1;
+
+  // Ignore out-of-order responses: only the newest request may write to
+  // the displayed analysis, so the console can never show a stale state.
+  const requestId = (requestRef.current || 0) + 1;
+  requestRef.current = requestId;
+
+  if (setLoading) setLoading(true);
+  if (setError) setError("");
+
+  try {
+    const analysisData = await analyzeSupport(
+      latestCustomerMessage.content,
+      sessionId,
+      customerTurn,
+      null,
+      messages.map((item) => ({
+        role: item.role,
+        content: item.content,
+      }))
+    );
+
+    if (requestRef.current !== requestId) {
+      return null;
+    }
+
+    if (setResult) setResult(analysisData);
+    if (setError) setError("");
+    return analysisData;
+  } catch (analysisError) {
+    console.error(
+      "Failed to analyze the customer message:",
+      analysisError
+    );
+
+    if (requestRef.current === requestId) {
+      if (setResult) setResult(null);
+      if (setError) {
+        setError(
+          analysisError.response?.data?.detail ||
+            analysisError.message ||
+            "The AI analysis request failed."
+        );
+      }
+    }
+
+    return null;
+  } finally {
+    if (requestRef.current === requestId && setLoading) {
+      setLoading(false);
+    }
+  }
+}
+
+/**
+ * Customer Configuration section of the Task 6 dashboard.
+ *
+ * Persona, scenario, initial emotion, severity and customer patience -
+ * the same five controls as the dedicated configuration screen, embedded
+ * in the dashboard so the whole interface is usable in one place.
+ * Submitting starts a new conversation with the chosen customer.
+ */
+function CustomerConfigurationCard({
+  config,
+  options,
+  onChange,
+  onSubmit,
+  saving,
+  error,
+  currentSession,
+}) {
+  return (
+    <form className="customer-config-card" onSubmit={onSubmit}>
+
+      <div className="customer-config-header">
+        <div>
+          <h3>Customer Configuration</h3>
+
+          <p>
+            Configure the customer, then start a new Task 6
+            conversation with these settings.
+          </p>
+        </div>
+
+        {currentSession?.scenario_name && (
+          <span className="customer-config-active">
+            Active: {currentSession.persona_name} ·{" "}
+            {currentSession.scenario_name}
+          </span>
+        )}
+      </div>
+
+      <div className="customer-config-grid">
+
+        <label className="customer-config-field">
+          <span>Customer Persona</span>
+
+          <select
+            name="persona"
+            value={config.persona}
+            onChange={onChange}
+          >
+            {options.personas.map((persona) => (
+              <option key={persona.value} value={persona.value}>
+                {persona.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="customer-config-field">
+          <span>Scenario</span>
+
+          <select
+            name="scenario"
+            value={config.scenario}
+            onChange={onChange}
+          >
+            {options.scenarios.map((scenario) => (
+              <option key={scenario.value} value={scenario.value}>
+                {scenario.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="customer-config-field">
+          <span>Initial Emotion</span>
+
+          <select
+            name="initial_emotion"
+            value={config.initial_emotion}
+            onChange={onChange}
+          >
+            {INITIAL_EMOTIONS.map((emotion) => (
+              <option key={emotion} value={emotion}>
+                {emotion.charAt(0).toUpperCase() + emotion.slice(1)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="customer-config-field">
+          <span>Severity</span>
+
+          <select
+            name="severity"
+            value={config.severity}
+            onChange={onChange}
+          >
+            {SEVERITIES.map((severity) => (
+              <option key={severity} value={severity}>
+                {severity.charAt(0).toUpperCase() + severity.slice(1)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="customer-config-field customer-config-patience">
+          <span>
+            Customer Patience: <strong>{config.patience}</strong> / 10
+          </span>
+
+          <input
+            type="range"
+            name="patience"
+            min="1"
+            max="10"
+            value={config.patience}
+            onChange={onChange}
+          />
+
+          <span className="slider-labels">
+            <span>Impatient</span>
+            <span>Patient</span>
+          </span>
+        </div>
+
+        <div className="customer-config-field customer-config-submit">
+          <button
+            type="submit"
+            className="primary-button"
+            disabled={saving}
+          >
+            {saving ? "Starting session..." : "Start configured session"}
+          </button>
+        </div>
+
+      </div>
+
+      {error && <div className="error-message">{error}</div>}
+
+    </form>
+  );
+}
 
 function SupportConsole() {
   const { sessionId } = useParams();
@@ -28,6 +280,7 @@ function SupportConsole() {
   // AI analysis + RAG results
   const [analysis, setAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisError, setAnalysisError] = useState("");
 
   // Guards against out-of-order analysis responses: only the newest
   // request may write to `analysis`, so the console can never display a
@@ -43,6 +296,16 @@ function SupportConsole() {
   const [draftEvaluation, setDraftEvaluation] = useState(null);
   const [checkingDraft, setCheckingDraft] = useState(false);
 
+  // Task 6: Customer Configuration (persona / scenario / initial emotion /
+  // severity / patience) shown on the dashboard itself, so a session can be
+  // (re)started with a different customer without leaving the screen.
+  const [config, setConfig] = useState(() => readStoredConfig());
+  const [configOptions, setConfigOptions] = useState(
+    FALLBACK_CONFIG_OPTIONS
+  );
+  const [startingSession, setStartingSession] = useState(false);
+  const [configError, setConfigError] = useState("");
+
   // ==========================================================
   // LOAD CURRENT ESCALATION THRESHOLD
   // ==========================================================
@@ -56,6 +319,82 @@ function SupportConsole() {
         /* threshold control is optional */
       });
   }, []);
+
+  // ==========================================================
+  // LOAD THE CUSTOMER CONFIGURATION CHOICES
+  // ==========================================================
+  // Personas / scenarios come from the backend so the Customer
+  // Configuration panel always offers what the simulator supports; the
+  // local fallback keeps every dropdown usable if the call fails.
+  useEffect(() => {
+    let cancelled = false;
+
+    getConfigOptions().then((options) => {
+      if (cancelled || !options) {
+        return;
+      }
+
+      setConfigOptions({
+        personas: options.personas?.length
+          ? options.personas
+          : FALLBACK_CONFIG_OPTIONS.personas,
+        scenarios: options.scenarios?.length
+          ? options.scenarios
+          : FALLBACK_CONFIG_OPTIONS.scenarios,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ==========================================================
+  // CUSTOMER CONFIGURATION (start a session with new settings)
+  // ==========================================================
+  const handleConfigChange = (event) => {
+    const { name, value } = event.target;
+
+    setConfig((previous) => ({
+      ...previous,
+      [name]: name === "patience" ? Number(value) : value,
+    }));
+  };
+
+  const handleStartConfiguredSession = async (event) => {
+    event.preventDefault();
+
+    if (startingSession) {
+      return;
+    }
+
+    setStartingSession(true);
+    setConfigError("");
+
+    try {
+      // `startSession` validates, remembers the configuration and the new
+      // session id, and creates the customer conversation on the backend.
+      const data = await startSession(config);
+
+      if (!data?.session_id) {
+        throw new Error("The backend did not return a session id.");
+      }
+
+      // Mount the new conversation. Keyed by `sessionId`, so the console
+      // reloads its state, analysis and risk monitor for the new session.
+      navigate(`/session/${data.session_id}`, { replace: true });
+    } catch (err) {
+      console.error("Failed to start the configured session:", err);
+
+      setConfigError(
+        err.response?.data?.detail ||
+          err.message ||
+          "Unable to start a session with this configuration."
+      );
+    } finally {
+      setStartingSession(false);
+    }
+  };
 
   // ==========================================================
   // USE THE AI-SUGGESTED RESPONSE
@@ -112,65 +451,20 @@ function SupportConsole() {
   // LOAD SESSION
   // ==========================================================
   useEffect(() => {
-    // ------------------------------------------------------
-    // Recalculate the customer state from the latest CUSTOMER
-    // message of a conversation. The result is the single source of
-    // truth for every displayed value (emotion, intensity,
-    // frustration, sentiment, satisfaction, escalation risk).
-    // ------------------------------------------------------
+    // Recalculate the customer state from the latest CUSTOMER message of
+    // the conversation (shared with the post-reply analysis, so the
+    // initial view and every submitted reply use the exact same pipeline).
     async function analyseLatestCustomerMessage(history) {
-      const messages = history || [];
-
-      const latestCustomerMessage = [...messages]
-        .reverse()
-        .find((item) => item.role === "customer");
-
-      if (!latestCustomerMessage?.content) {
-        return;
-      }
-
-      const customerTurn =
-        messages.filter((item) => item.role === "customer").length || 1;
-
-      const requestId = analysisRequestRef.current + 1;
-      analysisRequestRef.current = requestId;
-
-      try {
-        setAnalysisLoading(true);
-
-        // Task 6: full support-assistance pipeline
-        // (intent/sentiment + knowledge + coaching + emotion /
-        // frustration / satisfaction + escalation risk).
-        // `query` is ALWAYS the latest CUSTOMER message; the full
-        // role-tagged history is passed so repeat/streak signals
-        // use customer context only.
-        const analysisData = await analyzeSupport(
-          latestCustomerMessage.content,
-          sessionId,
-          customerTurn,
-          null,
-          messages.map((item) => ({
-            role: item.role,
-            content: item.content,
-          }))
-        );
-
-        // Ignore out-of-order responses.
-        if (analysisRequestRef.current !== requestId) {
-          return;
+      await analyseConversation(
+        history,
+        sessionId,
+        analysisRequestRef,
+        {
+          setLoading: setAnalysisLoading,
+          setResult: setAnalysis,
+          setError: setAnalysisError,
         }
-
-        setAnalysis(analysisData);
-      } catch (analysisError) {
-        console.error(
-          "Failed to analyze customer message:",
-          analysisError
-        );
-
-        setAnalysis(null);
-      } finally {
-        setAnalysisLoading(false);
-      }
+      );
     }
 
     async function loadSession() {
@@ -178,6 +472,10 @@ function SupportConsole() {
         const data = await getSession(sessionId);
 
         setSession(data);
+
+        // This tab now owns this conversation: returning to "/" (or
+        // refreshing) resumes it instead of creating a new session.
+        storeSessionId(sessionId);
 
         // If the backend says the session is already finished,
         // open the result page instead of keeping the user
@@ -297,6 +595,7 @@ function SupportConsole() {
     // NEXT message, so nothing from the previous message may stay on
     // screen while that happens.
     setAnalysis(null);
+    setAnalysisError("");
     setAnalysisLoading(true);
 
     try {
@@ -314,7 +613,9 @@ function SupportConsole() {
       // --------------------------------------------------
       setSession((previous) => ({
         ...previous,
-        turn_count: data.turn,
+        // The simulator returns `turn_count` (there is no `turn` key);
+        // keeping the previous value avoids an "undefined" turn display.
+        turn_count: data.turn_count ?? previous?.turn_count,
         // NOTE (Task 6): `data.emotion` is the simulator's own
         // post-reply estimate and is intentionally NOT displayed. The
         // console always shows the Task 6 analysis (emotion,
@@ -343,6 +644,8 @@ function SupportConsole() {
       if (data.finished) {
         setAnalysisLoading(false);
 
+        clearStoredSessionId();
+
         navigate(`/session/${sessionId}/result`, {
           replace: true,
         });
@@ -351,66 +654,34 @@ function SupportConsole() {
       }
 
       // --------------------------------------------------
-      // 4. Run the Task 6 support-assistance pipeline on
-      //    the CUSTOMER'S new message (emotion, frustration,
-      //    sentiment, satisfaction and escalation risk are all
-      //    recalculated from this message + context).
-      //    NEVER send the agent's own reply here: the backend
-      //    analyses only what the customer wrote.
+      // 4. Run the Task 6 support-assistance pipeline again so the AI
+      //    Analysis and the Escalation Risk Monitor reflect the LATEST
+      //    conversation state after EVERY submitted reply.
+      //
+      //    The analysed text is always the newest CUSTOMER message
+      //    (never the agent's own reply); the full role-tagged history is
+      //    sent so repeat pressure, negative streaks and satisfaction are
+      //    evaluated against the previous conversation. If the simulator
+      //    produced no new customer text, the latest customer message is
+      //    re-analysed with the updated history, so the monitor still
+      //    reflects the newest state instead of a stale value.
       // --------------------------------------------------
-      try {
-        const customerTurnCount =
-          (session?.history || []).filter(
-            (item) => item.role === "customer"
-          ).length + 1;
+      const updatedHistory = [
+        ...(session?.history || []),
+        { role: "agent", content: agentMessage },
+        { role: "customer", content: data.customer_message || "" },
+      ];
 
-        const updatedHistory = [
-          ...(session?.history || []),
-          { role: "agent", content: agentMessage },
-          { role: "customer", content: data.customer_message },
-        ];
-
-        // Never send an empty query (would be rejected with a 422
-        // and leave the monitor without a fresh calculation). If the
-        // simulator produced no new customer text, keep the last
-        // analysis instead of wiping it.
-        const newCustomerMessage = (
-          data.customer_message || ""
-        ).trim();
-
-        if (!newCustomerMessage) {
-          return;
+      await analyseConversation(
+        updatedHistory,
+        sessionId,
+        analysisRequestRef,
+        {
+          setLoading: setAnalysisLoading,
+          setResult: setAnalysis,
+          setError: setAnalysisError,
         }
-
-        const requestId = analysisRequestRef.current + 1;
-        analysisRequestRef.current = requestId;
-
-        const analysisData = await analyzeSupport(
-          newCustomerMessage,
-          sessionId,
-          customerTurnCount,
-          null,
-          updatedHistory
-        );
-
-        // Ignore out-of-order responses: only the newest request (the
-        // latest customer message) may be displayed.
-        if (analysisRequestRef.current !== requestId) {
-          return;
-        }
-
-        setAnalysis(analysisData);
-      } catch (analysisError) {
-        console.error(
-          "Failed to analyze customer message:",
-          analysisError
-        );
-
-        // Conversation should continue even if analysis fails
-        setAnalysis(null);
-      } finally {
-        setAnalysisLoading(false);
-      }
+      );
     } catch (err) {
       console.error("Failed to send message:", err);
 
@@ -422,6 +693,26 @@ function SupportConsole() {
     } finally {
       setSending(false);
     }
+  };
+
+  // ==========================================================
+  // RETRY THE AI ANALYSIS / ESCALATION RISK ASSESSMENT
+  // ==========================================================
+  // Used when the analysis request failed (backend hiccup, knowledge
+  // service unavailable, ...). It re-runs the same pipeline against the
+  // current conversation state, so the Escalation Risk Monitor never has
+  // to fall back to made-up values.
+  const handleRetryAnalysis = () => {
+    analyseConversation(
+      session?.history || [],
+      sessionId,
+      analysisRequestRef,
+      {
+        setLoading: setAnalysisLoading,
+        setResult: setAnalysis,
+        setError: setAnalysisError,
+      }
+    );
   };
 
   // ==========================================================
@@ -448,21 +739,75 @@ function SupportConsole() {
     return (
       <div className="console-page">
         <div className="console-loading">
-          Loading support session...
+          Loading Task 6 support session...
         </div>
       </div>
     );
   }
 
   // ==========================================================
-  // ERROR
+  // SESSION UNAVAILABLE (complete recovery screen, never a dead end)
   // ==========================================================
+  // The backend keeps sessions in memory, so a backend restart (or an
+  // expired conversation) makes an existing session id unknown. Instead
+  // of a bare error page the dashboard stays fully usable: the Customer
+  // Configuration is shown and a new conversation can be started in one
+  // click - without typing any internal URL or session id.
   if (!session) {
     return (
       <div className="console-page">
-        <div className="console-error">
-          {error || "Session not found."}
-        </div>
+
+        <header className="console-header">
+          <div>
+            <h1>SupportAI</h1>
+            <p>Live Support Console</p>
+          </div>
+
+          <div className="console-header-actions">
+            <span className="session-id">
+              Session: {sessionId}
+            </span>
+          </div>
+        </header>
+
+        <main className="console-content">
+
+          <div className="console-title">
+            <div>
+              <h2>Customer Support Session</h2>
+
+              <p>
+                This conversation is no longer available. Start a new
+                Task 6 session below.
+              </p>
+            </div>
+          </div>
+
+          <div className="console-error">
+            {error || "Session not found."}
+          </div>
+
+          <CustomerConfigurationCard
+            config={config}
+            options={configOptions}
+            onChange={handleConfigChange}
+            onSubmit={handleStartConfiguredSession}
+            saving={startingSession}
+            error={configError}
+            currentSession={null}
+          />
+
+          <div className="config-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => navigate("/")}
+            >
+              Create a Task 6 session automatically
+            </button>
+          </div>
+
+        </main>
       </div>
     );
   }
@@ -540,6 +885,20 @@ function SupportConsole() {
             </span>
           </div>
         </div>
+
+        {/* ==================================================
+            CUSTOMER CONFIGURATION (Task 6)
+        ================================================== */}
+
+        <CustomerConfigurationCard
+          config={config}
+          options={configOptions}
+          onChange={handleConfigChange}
+          onSubmit={handleStartConfiguredSession}
+          saving={startingSession}
+          error={configError}
+          currentSession={session}
+        />
 
         {/* ==================================================
             ERROR
@@ -851,7 +1210,22 @@ function SupportConsole() {
                       Escalation Risk:
                     </strong>{" "}
                     {analysis.escalation_risk ||
-                      "Unknown"}
+                      "Unknown"}{" "}
+                    {analysis.escalation_score !== undefined
+                      ? `(${analysis.escalation_score}/100 · ${
+                          analysis.escalation_trend || "stable"
+                        })`
+                      : ""}
+                  </p>
+
+                  {/* Negative Streak */}
+
+                  <p>
+                    <strong>
+                      Negative Streak:
+                    </strong>{" "}
+                    {analysis.negative_streak ?? 0}{" "}
+                    consecutive negative customer message(s)
                   </p>
 
                   {/* Confidence */}
@@ -867,8 +1241,20 @@ function SupportConsole() {
                 </>
               ) : (
                 <p>
-                  Analysis will appear after a customer
-                  response.
+                  {analysisError ? (
+                    <>
+                      The AI analysis is unavailable: {analysisError}{" "}
+                      <button
+                        type="button"
+                        className="retry-analysis-button"
+                        onClick={handleRetryAnalysis}
+                      >
+                        Retry analysis
+                      </button>
+                    </>
+                  ) : (
+                    "Analysis will appear after a customer response."
+                  )}
                 </p>
               )}
             </div>
@@ -1043,7 +1429,7 @@ function SupportConsole() {
 
               {analysisLoading ? (
                 <p>Assessing escalation risk...</p>
-              ) : (
+              ) : analysis ? (
                 <>
                   <div className="risk-row">
                     <span
@@ -1145,6 +1531,30 @@ function SupportConsole() {
                     </small>
                   </div>
                 </>
+              ) : (
+                // No risk values are guessed when the assessment is
+                // missing: the monitor states that it has no data and
+                // offers to run the analysis again.
+                <div className="analysis-unavailable">
+                  <p>
+                    The escalation risk assessment is
+                    unavailable
+                    {analysisError ? `: ${analysisError}` : "."}
+                  </p>
+
+                  <p className="analysis-unavailable-note">
+                    No score is displayed instead of a guessed
+                    value.
+                  </p>
+
+                  <button
+                    type="button"
+                    className="retry-analysis-button"
+                    onClick={handleRetryAnalysis}
+                  >
+                    Retry assessment
+                  </button>
+                </div>
               )}
 
             </div>

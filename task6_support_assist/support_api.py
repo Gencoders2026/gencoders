@@ -30,6 +30,7 @@ from typing import Dict, List, Optional
 
 from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, model_validator
 
 # ---------------------------------------------------------------------------
@@ -604,6 +605,65 @@ def escalation_state(session_id: str):
 # ==========================================================
 # STANDALONE APPLICATION
 # ==========================================================
+_LANDING_PAGE = """<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Task 6 - Support Assistance API</title>
+    <style>
+      body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+             background:#f5f7fb; color:#111827; }
+      .wrap { max-width: 760px; margin: 0 auto; padding: 60px 24px; }
+      h1 { margin:0 0 6px; color:#2563eb; }
+      .sub { color:#6b7280; margin:0 0 28px; }
+      .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px;
+              padding:22px; margin-bottom:18px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+      a.btn { display:inline-block; margin:6px 10px 0 0; padding:10px 16px;
+              border-radius:8px; background:#2563eb; color:#fff;
+              text-decoration:none; font-size:14px; }
+      a.btn.secondary { background:#fff; color:#2563eb; border:1px solid #2563eb; }
+      code { background:#f3f4f6; padding:2px 6px; border-radius:6px; font-size:13px; }
+      ul { margin:8px 0 0; padding-left:20px; color:#374151; }
+      li { margin-bottom:6px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Task 6 - Support Assistance API</h1>
+      <p class="sub">
+        Coaching &amp; Response Suggestion Agent + Escalation Risk Monitor Agent.
+        This service is running in <strong>standalone API mode</strong>.
+      </p>
+
+      <div class="card">
+        <strong>Open the Task 6 interface</strong>
+        <p>
+          The React Support Console (Customer Configuration, conversation,
+          AI Analysis and Escalation Risk Monitor) is served by the Customer
+          Simulator backend. Start it with:
+        </p>
+        <p><code>cd customer_simulator &amp;&amp; python -m uvicorn api:app --host 127.0.0.1 --port 8000</code></p>
+        <a class="btn" href="http://127.0.0.1:8000/">Open Task 6 interface (port 8000)</a>
+        <a class="btn secondary" href="http://localhost:5173/">React dev server (port 5173)</a>
+      </div>
+
+      <div class="card">
+        <strong>This API (port 8100)</strong>
+        <ul>
+          <li><code>POST /support/analyze</code> - full support-assistance pipeline</li>
+          <li><code>POST /coaching/evaluate</code> - evaluate a drafted reply</li>
+          <li><code>GET/POST /escalation/threshold</code> - alert threshold</li>
+          <li><code>GET /escalation/{session_id}</code> - monitor state snapshot</li>
+        </ul>
+        <a class="btn" href="/docs">API documentation</a>
+      </div>
+    </div>
+  </body>
+</html>
+"""
+
+
 def create_app() -> FastAPI:
     """
     Standalone Task 6 application.
@@ -628,6 +688,16 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(router)
+
+    # Friendly landing page for the standalone service (port 8100): opening
+    # the root used to return a raw `{"detail":"Not Found"}` JSON dump.
+    # This route lives ONLY on the standalone app - the shared `router`
+    # stays API-only, so mounting it on the Customer Simulator backend can
+    # never shadow that backend's own SPA root route.
+    application.get("/", include_in_schema=False, response_class=HTMLResponse)(
+        lambda: HTMLResponse(_LANDING_PAGE)
+    )
+
     return application
 
 app = create_app()
