@@ -25,6 +25,17 @@ import re
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+try:
+    # Normal package-relative / script-relative import.
+    from .contextual_replies import CONTEXTUAL_REPLIES
+except ImportError:  # pragma: no cover - depends on how the module is loaded
+    try:
+        from contextual_replies import CONTEXTUAL_REPLIES
+    except ImportError:
+        # Never let a missing/renamed data file break the simulator: the
+        # generator falls back to the plain band messages.
+        CONTEXTUAL_REPLIES = {}
+
 
 PERSONAS = {
     "polite": {
@@ -109,7 +120,44 @@ def get_band(level: int) -> str:
         return "furious"
 
 
+# Generic (non-reactive) conversation lines, keyed by scenario and then
+# by emotional band. Populated the first time a message is generated and
+# published here so the pools can be inspected and tested directly.
+BAND_POOLS: Dict[str, Dict[str, list]] = {}
+
+
 class CustomerSimulator:
+
+    # Flavour prefixes added on top of the generated base line.
+    # They are exposed on the class so tests (and the UI) can strip a
+    # prefix back off and compare the underlying base lines.
+    PERSONA_PREFIXES = {
+        "polite": [
+            "I am very disappointed with this situation. ",
+            "This is really upsetting. ",
+            "I did not expect this kind of experience. ",
+        ],
+        "concerned": [
+            "I'm quite worried about this. ",
+            "This is really concerning me. ",
+            "I'm getting quite anxious about this. ",
+        ],
+        "frustrated": [
+            "I'm starting to get concerned. ",
+            "I'm beginning to lose patience. ",
+            "This is becoming worrying. ",
+        ],
+        "angry": [
+            "I'm not happy about this. ",
+            "This is still frustrating. ",
+            "I remain unhappy with this. ",
+        ],
+        "furious": [
+            "I'm extremely unhappy with this situation. ",
+            "This is absolutely unacceptable to me. ",
+            "I'm furious about how this is going. ",
+        ],
+    }
 
     def __init__(
         self,
@@ -146,8 +194,19 @@ class CustomerSimulator:
 
         self.finished = False
 
-        # Keeps track of messages already displayed.
+        # Keeps track of messages already displayed (final text) and of
+        # the BASE lines, so the no-repeat protection also works when a
+        # persona prefix was prepended.
         self.used_messages = set()
+        self.used_bases = set()
+
+        # The BASE line said on the previous turn. It is never repeated
+        # while any other line is still available.
+        self._last_base = None
+
+        # What the agent did in its last reply - drives the next
+        # customer message.
+        self._last_agent_kind = None
 
         # Avoid repeating the same persona prefix twice in a row.
         self._last_prefix = None
@@ -281,9 +340,12 @@ class CustomerSimulator:
         # ------------------------------------------------------
         # NEXT CUSTOMER MESSAGE
         # ------------------------------------------------------
-
+        # The agent's actual reply is passed in, so the customer answers
+        # what the agent said (a request for details, a timeline, a
+        # vague stall, ...) instead of repeating a generic line.
         message = self._generate_customer_message(
-            opening=False
+            opening=False,
+            agent_message=agent_message
         )
 
         self._record(
@@ -494,9 +556,135 @@ class CustomerSimulator:
     # CUSTOMER MESSAGE GENERATOR
     # ==========================================================
 
+    # ==========================================================
+    # AGENT REPLY CLASSIFICATION (drives the next customer turn)
+    # ==========================================================
+    def _agent_reply_kind(self, agent_message: str) -> str:
+        """
+        Classify what the AGENT actually did, so the customer's next
+        message can react to it instead of being picked blindly.
+
+        The customer used to receive a message chosen only from the
+        emotional band, which meant the conversation ignored what the
+        agent said: the customer never answered a question, never
+        acknowledged a timeline and never pushed back on a vague reply.
+        The returned kind feeds `_contextual_replies`.
+
+        Returns one of:
+            asks_for_info     the agent asked the customer for something
+            asks_confirmation the agent asked the customer to confirm
+            gives_timeline    the agent made a concrete commitment
+            apology_only      the agent apologised without any action
+            vague             the agent stalled / deflected / hid policy
+            offers_help       a generic but non-committal reply
+        """
+        text = (agent_message or "").lower()
+
+        if not text.strip():
+            return "vague"
+
+        asks_for_info = re.search(
+            r"\b(?:could|can|please)\s+(?:you\s+)?(?:please\s+)?"
+            r"(?:provide|share|send|give|tell|forward|"
+            r"need|require)\b"
+            r"|\b(?:i|we)\s+(?:need|require)\s+(?:your|the|it|to)\b"
+            r"|\b(?:order|transaction|invoice|booking|reference|"
+            r"case|ticket)\s*(?:id|number|no\.?|#)\b"
+            r"|\bemail address\b",
+            text,
+        )
+        asks_confirmation = re.search(
+            r"\b(?:could|can|would)\s+you\s+(?:please\s+)?confirm\b"
+            r"|\bplease\s+confirm\b"
+            r"|\b(?:let\s+me|can\s+i)\s+verify\b",
+            text,
+        )
+        gives_timeline = re.search(
+            r"within\s+\d+"
+            r"|\b(?:processed|completed|confirmed|issued|refunded|"
+            r"reshipped|replaced|escalated)\b"
+            r"|\b\d+\s*(?:business\s+)?(?:day|hour|minute)s?\b"
+            r"|\bby\s+(?:tomorrow|end of day|tonight|monday|"
+            r"next week)\b",
+            text,
+        )
+        vague = re.search(
+            r"\b(?:let me|i'?ll|i will|we'?ll|we will)\s+"
+            r"(?:check|look|see|review|investigate|get back)\b"
+            r"|\b(?:look|check)ing\s+into\s+(?:this|it|that)\b"
+            r"|\bsoon\b|\blater\b|\bmaybe\b|\bdon'?t know\b"
+            r"|\bdo not know\b|\bunfortunately\b|\bpolicy\b"
+            r"|\boutside our control\b|\bas soon as possible\b"
+            r"|\bmight\b|\bpossibly\b",
+            text,
+        )
+        apology = re.search(
+            r"\bsorry\b|\bapolog(?:y|ies|ize|ise)\b"
+            r"|\bi understand\b|\bfrustrating\b|\bpatience\b",
+            text,
+        )
+
+        # `asks_confirmation` is checked BEFORE `asks_for_info` because
+        # a confirmation question also matches the "can you ..." shape.
+        if gives_timeline:
+            return "gives_timeline"
+        if asks_confirmation:
+            return "asks_confirmation"
+        if asks_for_info:
+            return "asks_for_info"
+        if vague:
+            return "vague"
+        if apology:
+            return "apology_only"
+        return "offers_help"
+
+    def _contextual_replies(self, kind: str) -> list:
+        """
+        Scenario-specific replies that REACT to what the agent just did.
+
+        Each entry is a list of (tone, message) pairs so the customer's
+        emotional band is still respected: a calm customer stays polite,
+        a furious one stays angry - but both now answer the agent.
+        """
+        return CONTEXTUAL_REPLIES.get(
+            self.scenario_name, {}
+        ).get(kind, [])
+
+    @staticmethod
+    def _pick_unused(
+        candidates: list,
+        used: set,
+        turn_count: int,
+        avoid: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Pick a line that has not been used yet, so the customer never
+        repeats themselves inside a conversation.
+
+        Candidates are rotated by the turn number (stable, predictable
+        variety) and used ones are skipped. `avoid` is the line used on
+        the previous turn and is never returned.
+
+        Returns None when the pool has nothing new to offer, so the
+        caller can fall through to the next (less specific) pool. Only
+        the caller's final fallback allows an already-used line.
+        """
+        if not candidates:
+            return None
+
+        for offset in range(len(candidates)):
+            candidate = candidates[
+                (turn_count + offset) % len(candidates)
+            ]
+            if candidate not in used and candidate != avoid:
+                return candidate
+
+        return None
+
     def _generate_customer_message(
         self,
-        opening=False
+        opening=False,
+        agent_message: Optional[str] = None
     ):
 
         level = self.frustration_level
@@ -734,14 +922,99 @@ class CustomerSimulator:
             }
         }
 
-        options = message_sets[
-            self.scenario_name
-        ][band]
+        # The pools are also published at module level so they can be
+        # inspected (and tested) without running a conversation.
+        BAND_POOLS.update(message_sets)
 
-        # Turn-based variation
-        index = self.turn_count % len(options)
+        # ------------------------------------------------------
+        # REACT TO THE AGENT'S REPLY (Task 3: the conversation must
+        # depend on what the support agent said, not only on the
+        # emotional band)
+        # ------------------------------------------------------
+        # When the agent asked for information, gave a timeline, only
+        # apologised or stalled, the customer answers THAT instead of
+        # repeating a generic line. The emotional band still decides
+        # how the answer is worded.
+        #
+        # Pools are tried in order of "how well does this line answer
+        # what the agent just said", and the first one that can still
+        # supply a line wins. This keeps the conversation reactive while
+        # still guaranteeing the customer never repeats itself.
+        contextual = []
 
-        message = options[index]
+        if not opening and agent_message:
+            kind = self._agent_reply_kind(agent_message)
+            self._last_agent_kind = kind
+
+            # Keep only the variants that match the current tone so a
+            # furious customer never answers politely.
+            contextual = [
+                text
+                for tone, text in self._contextual_replies(kind)
+                if tone in (band, "any")
+            ]
+
+        # The band pool is the scenario's generic conversation pool and
+        # is always available as a fallback.
+        options = message_sets[self.scenario_name][band]
+
+        pools = []
+        if contextual:
+            pools.append(contextual)
+
+            # A reply to a DIFFERENT kind of agent message is still far
+            # better than repeating the generic band line, so it is the
+            # second choice once the matching pool is exhausted.
+            for other_kind, lines in CONTEXTUAL_REPLIES.get(
+                self.scenario_name, {}
+            ).items():
+                if other_kind == kind:
+                    continue
+                other = [
+                    text for tone, text in lines if tone in (band, "any")
+                ]
+                if other:
+                    pools.append(other)
+
+        pools.append(options)
+
+        base = None
+
+        # Pass 1: only a line that has never been said.
+        for pool in pools:
+            base = self._pick_unused(
+                pool,
+                self.used_bases,
+                self.turn_count,
+                avoid=self._last_base,
+            )
+            if base:
+                break
+
+        if base is None:
+            # Pass 2: everything reachable has been said already.
+            # Reuse is acceptable, saying the SAME line twice in a row
+            # is not, so every pool is scanned for anything else.
+            widest = max(pools, key=len)
+            for offset in range(len(widest)):
+                candidate = widest[
+                    (self.turn_count + offset) % len(widest)
+                ]
+                if candidate != self._last_base:
+                    base = candidate
+                    break
+
+        if base is None:
+            # Every reachable line is a single line already used. Reuse
+            # the generic band pool so the conversation still moves on.
+            base = options[0]
+
+        # The BASE line is remembered separately from the final text
+        # so a persona prefix never hides a repeated line.
+        self.used_bases.add(base)
+        self._last_base = base
+
+        message = base
 
         # ------------------------------------------------------
         # PERSONA MODIFICATION
@@ -752,11 +1025,7 @@ class CustomerSimulator:
             if band in ["angry", "furious"]:
                 message = self._apply_prefix(
                     message,
-                    [
-                        "I am very disappointed with this situation. ",
-                        "This is really upsetting. ",
-                        "I did not expect this kind of experience. "
-                    ]
+                    self.PERSONA_PREFIXES["polite"]
                 )
 
         elif self.persona_name == "concerned":
@@ -764,11 +1033,7 @@ class CustomerSimulator:
             if band in ["angry", "furious"]:
                 message = self._apply_prefix(
                     message,
-                    [
-                        "I'm quite worried about this. ",
-                        "This is really concerning me. ",
-                        "I'm getting quite anxious about this. "
-                    ]
+                    self.PERSONA_PREFIXES["concerned"]
                 )
 
         elif self.persona_name == "frustrated":
@@ -776,11 +1041,7 @@ class CustomerSimulator:
             if band == "calm":
                 message = self._apply_prefix(
                     message,
-                    [
-                        "I'm starting to get concerned. ",
-                        "I'm beginning to lose patience. ",
-                        "This is becoming worrying. "
-                    ]
+                    self.PERSONA_PREFIXES["frustrated"]
                 )
 
         elif self.persona_name == "angry":
@@ -788,11 +1049,7 @@ class CustomerSimulator:
             if band in ["calm", "concerned"]:
                 message = self._apply_prefix(
                     message,
-                    [
-                        "I'm not happy about this. ",
-                        "This is still frustrating. ",
-                        "I remain unhappy with this. "
-                    ]
+                    self.PERSONA_PREFIXES["angry"]
                 )
 
         elif self.persona_name == "furious":
@@ -800,26 +1057,15 @@ class CustomerSimulator:
             if band in ["calm", "concerned", "frustrated"]:
                 message = self._apply_prefix(
                     message,
-                    [
-                        "I'm extremely unhappy with this situation. ",
-                        "This is absolutely unacceptable to me. ",
-                        "I'm furious about how this is going. "
-                    ]
+                    self.PERSONA_PREFIXES["furious"]
                 )
 
         # ------------------------------------------------------
-        # ABSOLUTE NO-REPEAT PROTECTION
+        # NO-REPEAT PROTECTION
         # ------------------------------------------------------
-
-        if message in self.used_messages:
-
-            for candidate in options:
-
-                if candidate not in self.used_messages:
-
-                    message = candidate
-                    break
-
+        # The BASE line is remembered separately from the final text
+        # so a repeated line is detected even when a persona prefix
+        # was prepended to it.
         self.used_messages.add(message)
 
         return message

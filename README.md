@@ -265,16 +265,20 @@ The frontend integrates all tasks into a single interactive console:
 All verification scripts are organized in the `scripts/` directory:
 
 ```bash
-# 1. Run unit test suite (52 tests across Task 4, 5, 6 agents)
+# 1. Run the Task 3 customer-simulator test suite (92 tests)
+cd task3_customer_simulator_agent
+python -m pytest test_simulator_replies.py -v
+
+# 2. Run the Task 4/5/6 unit test suite (55 tests)
 python -m pytest task4_task5_task6_support_assist_agents -v
 
-# 2. Verify all live API endpoints (run while backend is active on port 8000)
+# 3. Verify all live API endpoints (run while backend is active on port 8000)
 python scripts/verify_support_assist_endpoints.py
 
-# 3. Demo escalation risk movement turn-by-turn (both directions: furious -> mild -> calm -> furious)
+# 4. Demo escalation risk movement turn-by-turn (both directions: furious -> mild -> calm -> furious)
 python scripts/demo_escalation_risk_movement.py
 
-# 4. Simulate a complete multi-turn console conversation
+# 5. Simulate a complete multi-turn console conversation
 python scripts/simulate_console_conversation.py
 ```
 
