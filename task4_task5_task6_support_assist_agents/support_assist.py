@@ -131,6 +131,27 @@ _CUSTOMER_RESOLUTION_WORDS = frozenset([
     "working now", "works now", "all good", "sorted out", "taken care of",
 ])
 
+# Framing that turns a resolution word into a DEMAND instead of a
+# confirmation. "When will this be fixed?" / "I need this resolved
+# immediately" / "Tell me how you will sort it out" all contain a
+# resolution keyword, but they are the opposite of a confirmation - the
+# issue is still open and the customer is pressing for it. Without this
+# guard such a message released the customer's frustration and their
+# escalation risk, which is exactly backwards.
+_DEMANDS_A_RESOLUTION_RE = re.compile(
+    r"\b(?:when|how long|what|which|why)\b[^.?!]{0,40}?"
+    r"\b(?:will|would|should|can|could|are you going to|is|was|do|did)\b"
+    r"|\b(?:i|we)\s+(?:need|want|require|demand|expect|await)\b"
+    r"|\b(?:need|want)\s+(?:this|it|that|you)\b"
+    r"|\b(?:please\s+)?(?:fix|resolve|sort|update|check|provide|send|"
+    r"process|refund|cancel|change)\s+(?:this|it|that|my|our)\b"
+    r"|\b(?:tell|show|give)\s+me\b"
+    r"|\b(?:has|have|is|are|was|were)\s+(?:it|this|that|my|the\s+issue|"
+    r"the\s+order|my\s+order|my\s+refund)?\s*"
+    r"(?:been\s+)?(?:resolved|fixed|sorted|processed|handled)\b"
+    r"|\b(?:what|when)\b[^.?!]{0,30}?\b(?:happening|timeline|update)\b"
+)
+
 # Evidence the agent gave a CONCRETE commitment (used for the
 # "resolution offered" boost). A vague "I will check" is politeness,
 # NOT a commitment — only a specific timeline / concrete action or a
@@ -1251,11 +1272,14 @@ class EscalationRiskMonitor:
                         hits.append(phrase)
             return hits
 
-        # "not resolved" / "isn't fixed" must never read as resolved.
+        # "not resolved" / "isn't fixed" must never read as resolved, and
+        # neither may a DEMAND that merely contains a resolution keyword
+        # ("When will this be fixed?", "I need this resolved").
         customer_resolved = [
             t for t in past_customers
             if _phrases([t], _CUSTOMER_RESOLUTION_WORDS)
             and _has_unnegated(t, _CUSTOMER_RESOLUTION_WORDS)
+            and not _DEMANDS_A_RESOLUTION_RE.search(t)
         ]
         customer_requests = [
             t for t in past_customers
@@ -1573,7 +1597,9 @@ class EscalationRiskMonitor:
         resolution = self._resolution_state(
             customer_past_texts, agent_past_texts or []
         )
-        resolved_now = _has_unnegated(text_lower, _CUSTOMER_RESOLUTION_WORDS)
+        resolved_now = _has_unnegated(
+            text_lower, _CUSTOMER_RESOLUTION_WORDS
+        ) and not _DEMANDS_A_RESOLUTION_RE.search(text_lower)
 
         # ---- calming evidence (customer-written only) ---------
         calm_evidence: List[str] = []
@@ -2120,9 +2146,19 @@ class EscalationRiskMonitor:
         # resolved reply must never look like "the customer raised the
         # same issue again", otherwise a satisfied customer's risk score
         # would climb while the conversation is actually improving.
+        #
+        # IMPORTANT (escalation monitor correctness): the gate must use
+        # `latest_pressure` - the markers present in THIS message - and
+        # NOT `unaddressed_pressure`. `unaddressed_pressure` is true for
+        # practically every turn of a conversation, because the same
+        # intent keeps appearing in the history, so gating on it made the
+        # repeat-pressure indicator fire on every follow-up turn and the
+        # score could only ever climb, even after the customer had
+        # visibly calmed down. The release tiers in the score step below
+        # then had nothing left to release.
         message_pressure = (
             sentiment_label == "negative"
-            or unaddressed_pressure
+            or analysis.get("latest_pressure", False)
             or explicit_repeat_evidence
             or unresolved_signals
         )
@@ -2222,6 +2258,29 @@ class EscalationRiskMonitor:
                 "urgent_unmet_demand", 12, "urgent demand, issue open",
                 "Customer demands an immediate resolution while the "
                 "issue is still unresolved",
+            )
+
+        # ---- Furious on an open issue (calibration) --------------
+        # A very high frustration level combined with a negative tone on
+        # an issue that is demonstrably still open is an escalation
+        # precursor in its own right, even when the customer does not
+        # use an explicit urgency keyword ("I need a definite answer and
+        # timeline now"). Without this baseline such a customer only
+        # reached ~21/100 and was classified "Low", which is plainly
+        # wrong for a monitor whose job is to catch escalation early.
+        # It never fires on a resolved / resolved-eased message, and it
+        # never applies to a calm or neutral customer.
+        furious_on_open_issue = (
+            sentiment_label == "negative"
+            and frustration_score >= 8
+            and issue_open
+            and not resolved_eased
+        )
+        if furious_on_open_issue and not urgent_demand:
+            _add(
+                "high_frustration_open_issue", 12, emotion_label,
+                "Very high frustration while the issue is still open, "
+                "even without an explicit urgency keyword",
             )
 
         # ---- Tone drift vs CUSTOMER context ---------------------

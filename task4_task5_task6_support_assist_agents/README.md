@@ -24,7 +24,7 @@ task4_task5_task6_support_assist_agents/
 ├── support_assist.py        # Task 6 - Coaching + Escalation Risk agents
 ├── support_api.py           # FastAPI router + standalone app
 ├── run.py                   # Runs this API on its own (port 8100)
-├── test_support_assist.py   # 52 pytest checks (agents + API pipeline)
+├── test_support_assist.py   # 55 pytest checks (agents + API pipeline)
 ├── conftest.py              # makes the flat imports work from any cwd
 ├── requirements.txt         # dependencies of this module
 └── README.md
@@ -97,6 +97,25 @@ reached so far:
   | calming | explicit calming language (“okay, I understand”, “thank you”, positive words) and no new pressure | 40–50 % of the gap |
   | milder | no calming words, but **no** unresolved / repeat / escalation / urgency wording either, while the customer was at a high emotional level | 30 % of the gap |
   | pressing | the reply still presses the same issue (`still`, `again`, `when will`, a manager demand, urgency) | nothing — the score is held |
+* **A demand is not a confirmation.** “When will this be fixed?”, “I need
+  this resolved” and “tell me how you will sort this out” contain a
+  resolution keyword but are the *opposite* of a confirmation — the issue
+  is still open and the customer is pressing for it. They are matched
+  through `_DEMANDS_A_RESOLUTION_RE` and never release frustration or
+  risk (`test_demand_for_a_resolution_is_not_a_resolution`).
+* **Repeat pressure needs pressure in the current message.** The
+  repeat-pressure indicator is gated on `latest_pressure` (markers in
+  *this* reply), never on the conversation-level `unaddressed_pressure`.
+  Otherwise it fired on every follow-up turn — because the same intent
+  is always somewhere in the history — and the score could only ever
+  climb, even after the customer had visibly calmed down
+  (`test_neutral_repeat_does_not_inflate_risk`).
+* **A furious customer on an open issue is never “Low”.** Very high
+  frustration combined with a negative tone on an unresolved issue adds
+  `high_frustration_open_issue` (+12), so an escalating conversation
+  reaches the Medium/High bands and the configurable alert can fire even
+  when the customer has not yet said “supervisor”
+  (`test_furious_customer_on_open_issue_is_never_low_risk`).
 * **The release never below the fresh evidence.** `score >= fresh_score`
   always, so a calmer reply can lower the risk but can never make the
   conversation look safer than the message itself justifies.

@@ -829,6 +829,97 @@ def test_risk_moves_in_both_directions_with_every_reply(monitor):
     assert len({s for s in scores}) >= 4
 
 
+def test_neutral_repeat_does_not_inflate_risk(monitor):
+    """A calm re-statement of the same issue must NOT keep raising risk.
+
+    Regression test: the repeat-pressure gate used to include
+    `unaddressed_pressure`, which is true for essentially every turn of
+    a conversation (the same intent keeps appearing in the history). That
+    made the indicator fire on every follow-up and the score could only
+    ever climb, even once the customer had calmed down.
+    """
+    results = _conversation(monitor, "s-calm-repeat", [
+        (None, "My refund has not arrived yet and nobody has helped me. "
+               "This is unacceptable!"),
+        (_AGENT_ACK, "Thanks for checking. Could you send me a refund "
+                     "update when you have it?"),
+        (_AGENT_ACK, "Okay, thanks. I will wait for your reply."),
+    ])
+    scores = [r["escalation_score"] for r in results]
+
+    # Turn 2 and 3 are polite / appreciative, so the score must come back
+    # down instead of climbing turn after turn.
+    assert scores[1] < scores[0]
+    assert scores[2] < scores[1]
+    assert results[1]["trend"] == "decreasing"
+    assert results[2]["trend"] == "decreasing"
+    # Turn 2 is still an angry customer (frustration 7), so it may still be
+    # High - but by turn 3 the risk must be back in the Low band.
+    assert results[2]["escalation_level"] == "Low"
+    assert results[-1]["frustration"] <= 5
+
+
+def test_demand_for_a_resolution_is_not_a_resolution(monitor):
+    """"When will this be fixed?" is a DEMAND, not a confirmation.
+
+    Regression test: the resolution keywords ("fixed", "resolved") were
+    matched without any framing check, so an angry customer pressing for
+    a fix was treated as a satisfied customer - their frustration and
+    their escalation risk were released by the very message that proved
+    the issue was still open.
+    """
+    for message in (
+        "When will this be fixed?",
+        "I need this resolved immediately!",
+        "Can you tell me how you will sort this out?",
+        "Please fix my refund as soon as possible.",
+    ):
+        result = monitor.assess(
+            f"s-demand-{abs(hash(message))}", message, turn=1
+        )
+        assert result["resolution_status"] != "resolved", message
+        assert result["de_escalation"] != "strong", message
+        assert "resolution confirmed" not in result["calm_evidence"], message
+
+    # ... while genuine confirmations still release everything.
+    for message in (
+        "Perfect, that's resolved. Thank you so much!",
+        "Thanks, it is all good now.",
+    ):
+        result = monitor.assess(
+            f"s-confirm-{abs(hash(message))}", message, turn=1
+        )
+        assert result["de_escalation"] == "strong", message
+        assert result["escalation_score"] == 0, message
+
+
+def test_furious_customer_on_open_issue_is_never_low_risk(monitor):
+    """A furious customer with an unresolved issue must not read "Low".
+
+    Regression test: without a high-frustration baseline the monitor
+    scored a furious, demanding customer at ~21/100 and classified it
+    "Low", so the configurable alert could never fire for an escalating
+    conversation that had not yet used the words "supervisor"/"manager".
+    """
+    result = monitor.assess(
+        "s-furious-open",
+        "This refund delay is unacceptable. I need a definite answer and "
+        "timeline now.",
+        turn=1,
+    )
+    assert result["frustration"] >= 8
+    assert result["escalation_level"] in ("Medium", "High", "Critical")
+    assert result["escalation_score"] >= 25
+    # A polite customer with the same issue stays Low.
+    polite = monitor.assess(
+        "s-polite-open",
+        "Hi, I ordered last week and it has not arrived yet. Please help.",
+        turn=1,
+    )
+    assert polite["escalation_level"] == "Low"
+    assert polite["alert"]["triggered"] is False
+
+
 def test_apology_alone_never_lowers_risk(monitor):
     results = _conversation(monitor, "s-apology", [
         (None, "My account is locked and nobody has helped me. This is "

@@ -1,32 +1,24 @@
+﻿"""Live console-flow check: session -> agent replies -> risk movement.
+
+Exercises the real endpoints the Support Console uses
+(`/session/start`, `/session/respond`, `/support/analyze`) exactly the way
+`support_console_frontend/src/pages/SupportConsole.jsx` does, and prints
+the escalation-risk state after every customer reply.
 """
-Reproduce the Support Console escalation-risk flow turn by turn.
-
-Runs a real session against the Customer Simulator backend
-(http://127.0.0.1:8000): the customer's message is pushed through
-POST /support/analyze with the full role-tagged history - exactly the
-way support_console_frontend/src/pages/SupportConsole.jsx does it - and the
-resulting risk score / level / trend / streak is printed.
-
-The agent reply for each turn is the AI-suggested response
-(`suggested_response`), which is what happens when the user clicks
-"Use this response" in the console.
-
-Usage:
-    python scripts/simulate_console_conversation.py                    # frustrated / delayed_order / 7
-    python scripts/simulate_console_conversation.py angry refund_request 8
-"""
-
 import json
-import random
-import sys
 import urllib.request
 
 BASE = "http://127.0.0.1:8000"
 
-DEFAULT_PERSONA = "frustrated"
-DEFAULT_SCENARIO = "delayed_order"
-DEFAULT_LEVEL = 7
-TURNS = 6
+AGENT_REPLIES = [
+    # Deliberately non-resolving replies: the monitor must keep reacting to
+    # every customer message, so the conversation is allowed to continue.
+    "I am sorry for the delay. I am checking the status of your refund "
+    "right now and will come back to you shortly.",
+    "Thanks for waiting. Could you confirm the transaction ID on the "
+    "order so I can trace it?",
+    "Thank you for your patience. I am still looking into this for you.",
+]
 
 
 def post(path, payload):
@@ -36,92 +28,63 @@ def post(path, payload):
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=30) as response:
+    with urllib.request.urlopen(request, timeout=120) as response:
         return json.load(response)
 
 
-def run(persona, scenario, level):
-    session_id = "repro-" + str(random.randint(1000, 9999))
+started = post("/session/start", {
+    "persona": "frustrated",
+    "scenario": "refund_request",
+    "frustration_level": 7,
+})
+session_id = started["session_id"]
+history = list(started["history"])
 
-    started = post(
-        "/session/start",
-        {
-            "persona": persona,
-            "scenario": scenario,
-            "frustration_level": level,
-            "expected_resolution": "new_delivery_date",
-        },
-    )
+analysis = post("/support/analyze", {
+    "query": started["customer_message"],
+    "session_id": session_id,
+    "turn": 1,
+    "history": history,
+})
+print(f"session={session_id}")
+print(
+    f"T1 risk={analysis['escalation_score']:>3} "
+    f"{analysis['escalation_level']:<8} {analysis['escalation_trend']:<13} "
+    f"| {started['customer_message'][:60]}"
+)
 
+for turn, agent_reply in enumerate(AGENT_REPLIES, start=2):
+    reply = post("/session/respond", {
+        "session_id": session_id,
+        "message": agent_reply,
+    })
+    if reply.get("finished"):
+        print("   conversation finished by the simulator")
+        break
+
+    history = history + [
+        {"role": "agent", "content": agent_reply},
+        {"role": "customer", "content": reply["customer_message"]},
+    ]
+    analysis = post("/support/analyze", {
+        "query": reply["customer_message"],
+        "session_id": session_id,
+        "turn": turn,
+        "history": history,
+    })
     print(
-        f"session={started['session_id']} persona={started['persona']} "
-        f"scenario={started['scenario']} level={level}"
+        f"T{turn} risk={analysis['escalation_score']:>3} "
+        f"{analysis['escalation_level']:<8} "
+        f"{analysis['escalation_trend']:<13} "
+        f"sat={analysis['satisfaction_trend']:<10} "
+        f"| {reply['customer_message'][:50]}"
     )
-    print()
 
-    history = list(started.get("history") or [])
-    customer_message = started["customer_message"]
-    previous_score = None
-
-    for turn in range(1, TURNS + 1):
-        customer_turn = len(
-            [m for m in history if m.get("role") == "customer"]
-        )
-
-        analysis = post(
-            "/support/analyze",
-            {
-                "query": customer_message,
-                "session_id": session_id,
-                "turn": customer_turn,
-                "sender": "customer",
-                "history": [
-                    {"role": m.get("role"), "content": m.get("content", "")}
-                    for m in history
-                ],
-            },
-        )
-
-        score = analysis["escalation_score"]
-        delta = "" if previous_score is None else f" ({score - previous_score:+d})"
-        previous_score = score
-        print(
-            f"T{turn} risk={score:>3}{delta:<6} "
-            f"{analysis['escalation_level']:<8} "
-            f"trend={analysis['escalation_trend']:<13} "
-            f"frust={analysis['frustration_level']}/10 "
-            f"sent={analysis['sentiment']:<8} "
-            f"streak={analysis['negative_streak']} "
-            f"deesc={analysis['de_escalation']}"
-        )
-        print(f"    customer: {analysis['customer_message'][:95]}")
-
-        for line in analysis.get("escalation_reasoning", []):
-            print(f"      - {line}")
-
-        if turn == TURNS:
-            break
-
-        agent_reply = analysis.get("suggested_response") or "Okay, let me check."
-        reply = post(
-            "/session/respond",
-            {"session_id": started["session_id"], "message": agent_reply},
-        )
-
-        history.append({"role": "agent", "content": agent_reply})
-        history.append(
-            {"role": "customer", "content": reply.get("customer_message", "")}
-        )
-        customer_message = reply.get("customer_message", "")
-        print()
-
-
-def main():
-    persona = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_PERSONA
-    scenario = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_SCENARIO
-    level = int(sys.argv[3]) if len(sys.argv) > 3 else DEFAULT_LEVEL
-    run(persona, scenario, level)
-
-
-if __name__ == "__main__":
-    main()
+state = post("/support/analyze", {
+    "query": started["customer_message"],
+    "session_id": session_id + "-state",
+    "turn": 1,
+    "history": history,
+})
+print(f"\nFINAL: risk={state['escalation_score']} "
+      f"{state['escalation_level']} alert={state['alert']['triggered']}")
