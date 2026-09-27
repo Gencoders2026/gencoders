@@ -40,7 +40,10 @@ ROOT_DIR = BASE_DIR.parent
 # root page so the browser gets the working Support Console (with the
 # escalation risk monitor, coaching panel, emotion/frustration state,
 # etc.) instead of the old static HTML page.
-REACT_DIST_DIR = ROOT_DIR / "frontend" / "dist"
+# Support both old 'frontend/dist' and new 'task5_frontend_dashboard/dist'
+REACT_DIST_DIR = ROOT_DIR / "task5_frontend_dashboard" / "dist"
+if not REACT_DIST_DIR.exists():
+    REACT_DIST_DIR = ROOT_DIR / "frontend" / "dist"
 FRONTEND_DIR = BASE_DIR / "frontend"
 INDEX_PATH = REACT_DIST_DIR / "index.html"
 LOG_DIR = BASE_DIR / "logs"
@@ -389,6 +392,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "api:app",
         host="127.0.0.1",
-        port=8000,
+        port=8080,
         reload=True
     )
