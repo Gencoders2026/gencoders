@@ -11,41 +11,22 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-
-        {/* Opening the project lands directly on the Task 6 interface.
-            `SessionAutoStart` resumes the conversation of this tab when
-            there is one, otherwise it creates a session automatically
-            (with the last Customer Configuration) and opens the console -
-            no internal URL or session id has to be typed. */}
-        <Route path="/" element={<SessionAutoStart />} />
-
+        {/* Main landing dashboard with "+ Start New Session", stats, and recent sessions */}
+        <Route path="/" element={<Dashboard />} />
         <Route path="/dashboard" element={<Dashboard />} />
 
-        {/* Full Customer Configuration screen (persona / scenario /
-            initial emotion / severity / patience). */}
-        <Route
-          path="/session/new"
-          element={<SessionConfiguration />}
-        />
+        {/* Full Customer Configuration screen (mode / persona / scenario / initial emotion / severity / resolution / frustration & patience sliders) */}
+        <Route path="/session/new" element={<SessionConfiguration />} />
 
-        {/* Task 6 conversation interface + AI Analysis + Escalation Risk
-            Monitor. The configuration panel lives inside this screen too,
-            so the whole dashboard is visible at once. */}
-        <Route
-          path="/session/:sessionId"
-          element={<SupportConsole />}
-        />
+        {/* Auto-start convenience route */}
+        <Route path="/auto" element={<SessionAutoStart />} />
 
-        <Route
-          path="/session/:sessionId/result"
-          element={<SessionResult />}
-        />
+        {/* Live Support Console with Task 6 AI Analysis, Coaching, Suggestions, Knowledge & Escalation Risk Monitor */}
+        <Route path="/session/:sessionId" element={<SupportConsole />} />
+        <Route path="/session/:sessionId/result" element={<SessionResult />} />
 
-        <Route
-          path="/analytics"
-          element={<Analytics />}
-        />
-
+        {/* Analytics page */}
+        <Route path="/analytics" element={<Analytics />} />
       </Routes>
     </BrowserRouter>
   );
