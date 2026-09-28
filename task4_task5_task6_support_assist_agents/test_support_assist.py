@@ -1315,3 +1315,9 @@ def test_support_analyze_risk_moves_on_every_reply(client):
     assert scores[-1] > scores[0]
     assert trends[0] == "first_message"
     assert all(trend == "increasing" for trend in trends[1:])
+
+
+if __name__ == "__main__":
+    import pytest
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))
