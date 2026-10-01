@@ -634,7 +634,7 @@ _LANDING_PAGE = """<!doctype html>
   </head>
   <body>
     <div class="wrap">
-      <h1>Task 4 / 5 / 6 - Support Assistance API</h1>
+      <h1>Task 6 - Escalation Risk Monitor</h1>
       <p class="sub">
         Intent &amp; Sentiment Analysis Agent, Knowledge Recommendation Agent,
         Coaching &amp; Response Suggestion Agent and Escalation Risk Monitor Agent.
@@ -662,6 +662,16 @@ _LANDING_PAGE = """<!doctype html>
           <li><code>GET /escalation/{session_id}</code> - monitor state snapshot</li>
         </ul>
         <a class="btn" href="/docs">API documentation</a>
+      </div>
+
+      <div class="card">
+        <strong>Task 6 - Escalation Risk Monitor</strong>
+        <p>
+          The dedicated Task 6 screen (live escalation risk scoring from the
+          real customer reply and conversation context) is part of the React
+          Support Console:
+        </p>
+        <a class="btn" href="http://localhost:5173/task6">Task 6 - Escalation Risk Monitor</a>
       </div>
     </div>
   </body>

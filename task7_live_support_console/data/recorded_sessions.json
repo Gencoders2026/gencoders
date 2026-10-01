@@ -1,0 +1,417 @@
+{
+  "sessions": [
+    {
+      "id": "conv-50d6904af8",
+      "mode": "manual",
+      "title": "live e2e check",
+      "persona": null,
+      "scenario": null,
+      "source_file": null,
+      "is_demo": false,
+      "tags": [],
+      "messages": [
+        {
+          "role": "customer",
+          "content": "My payment failed and I have been trying for two hours.",
+          "timestamp": null,
+          "turn": null
+        },
+        {
+          "role": "customer",
+          "content": "This is ridiculous. Nobody is helping me and I need this fixed immediately.",
+          "timestamp": null,
+          "turn": null
+        },
+        {
+          "role": "customer",
+          "content": "Thank you, the issue is finally resolved.",
+          "timestamp": null,
+          "turn": null
+        }
+      ],
+      "knowledge_searches": [],
+      "meta": {},
+      "created_at": "2026-10-01T00:09:43+00:00"
+    },
+    {
+      "id": "demo-conv-01",
+      "mode": "manual",
+      "title": "Demo - duplicate payment charge",
+      "persona": "frustrated",
+      "scenario": "payment_failure",
+      "source_file": "demo_sessions.py",
+      "is_demo": true,
+      "tags": [
+        "demo",
+        "task8",
+        "test-data"
+      ],
+      "created_at": "2026-01-01T09:00:00+00:00",
+      "completed_at": "2026-01-01T09:00:00+00:00",
+      "messages": [
+        {
+          "role": "customer",
+          "content": "My payment failed and I have been trying for two hours.",
+          "timestamp": "2026-01-01T09:00:00+00:00"
+        },
+        {
+          "role": "agent",
+          "content": "I am really sorry about that. I can see two authorisations on your card. Let me check the transaction now.",
+          "timestamp": "2026-01-01T09:00:00+00:00"
+        },
+        {
+          "role": "customer",
+          "content": "This is ridiculous. Nobody is helping me and I need this fixed immediately.",
+          "timestamp": "2026-01-01T09:00:00+00:00"
+        },
+        {
+          "role": "agent",
+          "content": "I completely understand how frustrating this is. I have released the duplicate authorisation and it will drop off within 24 hours.",
+          "timestamp": "2026-01-01T09:00:00+00:00"
+        },
+        {
+          "role": "customer",
+          "content": "Thank you, the issue is finally resolved.",
+          "timestamp": "2026-01-01T09:00:00+00:00"
+        }
+      ],
+      "knowledge_searches": [
+        {
+          "turn": 1,
+          "query": "My payment failed and I have been trying for two hours.",
+          "results": 3,
+          "sources": [
+            "payment_issues.txt"
+          ]
+        },
+        {
+          "turn": 2,
+          "query": "This is ridiculous. Nobody is helping me and I need this fixed immediately.",
+          "results": 0,
+          "sources": []
+        }
+      ],
+      "meta": {
+        "is_demo": true,
+        "note": "Realistic demo conversation used to populate the performance-analytics dashboard. Labelled as demo data everywhere it is displayed."
+      }
+    },
+    {
+      "id": "demo-conv-02",
+      "mode": "manual",
+      "title": "Demo - delayed order follow-up",
+      "persona": "concerned",
+      "scenario": "delayed_order",
+      "source_file": "demo_sessions.py",
+      "is_demo": true,
+      "tags": [
+        "demo",
+        "task8",
+        "test-data"
+      ],
+      "created_at": "2026-01-02T11:00:00+00:00",
+      "completed_at": "2026-01-02T11:00:00+00:00",
+      "messages": [
+        {
+          "role": "customer",
+          "content": "Where is my order? It is very late and the tracking has not changed in four days.",
+          "timestamp": "2026-01-02T11:00:00+00:00"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for flagging that. I am checking the courier status for you right away.",
+          "timestamp": "2026-01-02T11:00:00+00:00"
+        },
+        {
+          "role": "customer",
+          "content": "I have already contacted support twice about this and it is still not here.",
+          "timestamp": "2026-01-02T11:00:00+00:00"
+        },
+        {
+          "role": "agent",
+          "content": "I am sorry you had to chase this. I have raised a priority tracer with the courier and you will have an update within 24 hours.",
+          "timestamp": "2026-01-02T11:00:00+00:00"
+        },
+        {
+          "role": "customer",
+          "content": "Please make sure it actually arrives this time.",
+          "timestamp": "2026-01-02T11:00:00+00:00"
+        }
+      ],
+      "knowledge_searches": [
+        {
+          "turn": 1,
+          "query": "Where is my order? It is very late and the tracking has not changed in four days.",
+          "results": 3,
+          "sources": [
+            "delivery_delays.txt"
+          ]
+        },
+        {
+          "turn": 2,
+          "query": "I have already contacted support twice about this and it is still not here.",
+          "results": 2,
+          "sources": [
+            "delivery_delays.txt",
+            "order_tracking.txt"
+          ]
+        }
+      ],
+      "meta": {
+        "is_demo": true,
+        "note": "Realistic demo conversation used to populate the performance-analytics dashboard. Labelled as demo data everywhere it is displayed."
+      }
+    },
+    {
+      "id": "demo-conv-03",
+      "mode": "manual",
+      "title": "Demo - refund not received",
+      "persona": "frustrated",
+      "scenario": "refund_request",
+      "source_file": "demo_sessions.py",
+      "is_demo": true,
+      "tags": [
+        "demo",
+        "task8",
+        "test-data"
+      ],
+      "created_at": "2026-01-03T13:00:00+00:00",
+      "completed_at": "2026-01-03T13:00:00+00:00",
+      "messages": [
+        {
+          "role": "customer",
+          "content": "I returned the item two weeks ago and the refund has not arrived.",
+          "timestamp": "2026-01-03T13:00:00+00:00"
+        },
+        {
+          "role": "agent",
+          "content": "Let me look into that for you.",
+          "timestamp": "2026-01-03T13:00:00+00:00"
+        },
+        {
+          "role": "customer",
+          "content": "This is unacceptable. I want my money back now.",
+          "timestamp": "2026-01-03T13:00:00+00:00"
+        },
+        {
+          "role": "agent",
+          "content": "I understand. I have processed the refund manually and it will reach your account within 3 to 5 business days.",
+          "timestamp": "2026-01-03T13:00:00+00:00"
+        },
+        {
+          "role": "customer",
+          "content": "Fine, I will wait and see.",
+          "timestamp": "2026-01-03T13:00:00+00:00"
+        }
+      ],
+      "knowledge_searches": [
+        {
+          "turn": 1,
+          "query": "I returned the item two weeks ago and the refund has not arrived.",
+          "results": 3,
+          "sources": [
+            "Refund Policy.pdf"
+          ]
+        },
+        {
+          "turn": 2,
+          "query": "This is unacceptable. I want my money back now.",
+          "results": 2,
+          "sources": [
+            "Refund Policy.pdf"
+          ]
+        }
+      ],
+      "meta": {
+        "is_demo": true,
+        "note": "Realistic demo conversation used to populate the performance-analytics dashboard. Labelled as demo data everywhere it is displayed."
+      }
+    },
+    {
+      "id": "demo-conv-04",
+      "mode": "manual",
+      "title": "Demo - locked account recovery",
+      "persona": "angry",
+      "scenario": "account_issue",
+      "source_file": "demo_sessions.py",
+      "is_demo": true,
+      "tags": [
+        "demo",
+        "task8",
+        "test-data"
+      ],
+      "created_at": "2026-01-04T15:00:00+00:00",
+      "completed_at": "2026-01-04T15:00:00+00:00",
+      "messages": [
+        {
+          "role": "customer",
+          "content": "I am locked out of my account and the password reset email never arrives.",
+          "timestamp": "2026-01-04T15:00:00+00:00"
+        },
+        {
+          "role": "agent",
+          "content": "That sounds frustrating. Have you checked your spam folder?",
+          "timestamp": "2026-01-04T15:00:00+00:00"
+        },
+        {
+          "role": "customer",
+          "content": "Yes of course I have. Stop giving me generic answers and unlock my account.",
+          "timestamp": "2026-01-04T15:00:00+00:00"
+        },
+        {
+          "role": "agent",
+          "content": "You are right, I am sorry. I have reset the account manually and emailed you a secure link - it expires in 15 minutes.",
+          "timestamp": "2026-01-04T15:00:00+00:00"
+        },
+        {
+          "role": "customer",
+          "content": "It works now, thank you.",
+          "timestamp": "2026-01-04T15:00:00+00:00"
+        }
+      ],
+      "knowledge_searches": [
+        {
+          "turn": 1,
+          "query": "I am locked out of my account and the password reset email never arrives.",
+          "results": 3,
+          "sources": [
+            "login_issues.txt"
+          ]
+        },
+        {
+          "turn": 2,
+          "query": "Yes of course I have. Stop giving me generic answers and unlock my account.",
+          "results": 1,
+          "sources": [
+            "password_reset.txt"
+          ]
+        }
+      ],
+      "meta": {
+        "is_demo": true,
+        "note": "Realistic demo conversation used to populate the performance-analytics dashboard. Labelled as demo data everywhere it is displayed."
+      }
+    },
+    {
+      "id": "demo-conv-05",
+      "mode": "manual",
+      "title": "Demo - cancellation with retention offer",
+      "persona": "polite",
+      "scenario": "cancellation",
+      "source_file": "demo_sessions.py",
+      "is_demo": true,
+      "tags": [
+        "demo",
+        "task8",
+        "test-data"
+      ],
+      "created_at": "2026-01-05T17:00:00+00:00",
+      "completed_at": "2026-01-05T17:00:00+00:00",
+      "messages": [
+        {
+          "role": "customer",
+          "content": "I would like to cancel my subscription please.",
+          "timestamp": "2026-01-05T17:00:00+00:00"
+        },
+        {
+          "role": "agent",
+          "content": "Of course - may I ask what prompted the decision? I may be able to offer an alternative.",
+          "timestamp": "2026-01-05T17:00:00+00:00"
+        },
+        {
+          "role": "customer",
+          "content": "It is too expensive for how little I use it.",
+          "timestamp": "2026-01-05T17:00:00+00:00"
+        },
+        {
+          "role": "agent",
+          "content": "Understood. I can move you to the lighter plan at half the price, or cancel immediately if you prefer.",
+          "timestamp": "2026-01-05T17:00:00+00:00"
+        },
+        {
+          "role": "customer",
+          "content": "The lighter plan sounds good actually, thanks.",
+          "timestamp": "2026-01-05T17:00:00+00:00"
+        }
+      ],
+      "knowledge_searches": [
+        {
+          "turn": 1,
+          "query": "I would like to cancel my subscription please.",
+          "results": 3,
+          "sources": [
+            "Cancellation Policy.pdf"
+          ]
+        }
+      ],
+      "meta": {
+        "is_demo": true,
+        "note": "Realistic demo conversation used to populate the performance-analytics dashboard. Labelled as demo data everywhere it is displayed."
+      }
+    },
+    {
+      "id": "demo-conv-06",
+      "mode": "manual",
+      "title": "Demo - unresolved billing query",
+      "persona": "concerned",
+      "scenario": "general_inquiry",
+      "source_file": "demo_sessions.py",
+      "is_demo": true,
+      "tags": [
+        "demo",
+        "task8",
+        "test-data"
+      ],
+      "created_at": "2026-01-06T19:00:00+00:00",
+      "completed_at": "2026-01-06T19:00:00+00:00",
+      "messages": [
+        {
+          "role": "customer",
+          "content": "I do not recognise a charge on my last invoice.",
+          "timestamp": "2026-01-06T19:00:00+00:00"
+        },
+        {
+          "role": "agent",
+          "content": "Thanks for reaching out, we will look into this for you.",
+          "timestamp": "2026-01-06T19:00:00+00:00"
+        },
+        {
+          "role": "customer",
+          "content": "It has been two days and I still have no answer. I need this sorted.",
+          "timestamp": "2026-01-06T19:00:00+00:00"
+        },
+        {
+          "role": "agent",
+          "content": "Is there anything else I can help you with today?",
+          "timestamp": "2026-01-06T19:00:00+00:00"
+        },
+        {
+          "role": "customer",
+          "content": "That is not helpful. I will dispute the charge with my bank.",
+          "timestamp": "2026-01-06T19:00:00+00:00"
+        }
+      ],
+      "knowledge_searches": [
+        {
+          "turn": 1,
+          "query": "I do not recognise a charge on my last invoice.",
+          "results": 2,
+          "sources": [
+            "billing_queries.txt"
+          ]
+        },
+        {
+          "turn": 2,
+          "query": "It has been two days and I still have no answer.",
+          "results": 0,
+          "sources": []
+        }
+      ],
+      "meta": {
+        "is_demo": true,
+        "note": "Realistic demo conversation used to populate the performance-analytics dashboard. Labelled as demo data everywhere it is displayed."
+      }
+    }
+  ],
+  "updated_at": "2026-10-01T01:08:59+00:00"
+}

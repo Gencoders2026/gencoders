@@ -67,6 +67,38 @@ if TASK6_DIR.exists():
     from support_api import router as task6_router  # noqa: E402
 
 
+# ==========================================================
+# TASK 7 - LIVE SUPPORT CONSOLE MODULE (separate folder)
+# ==========================================================
+# task7_live_support_console/console_api.py exposes the shared router with
+# /task7/analyze, /task7/transcript/parse and /task7/sessions... so the
+# three-panel console (Manual Mode + Replay Mode) talks to this same
+# backend.
+TASK7_DIR = ROOT_DIR / "task7_live_support_console"
+task7_router = None
+
+if TASK7_DIR.exists():
+    if str(TASK7_DIR) not in sys.path:
+        sys.path.insert(0, str(TASK7_DIR))
+
+    from console_api import router as task7_router  # noqa: E402
+
+
+# ==========================================================
+# TASK 8 - POST-INTERACTION SUMMARY + PERFORMANCE ANALYTICS
+# ==========================================================
+# task8_insights_analytics/insights_api.py exposes /task8/summary,
+# /task8/analytics, /task8/conversations and /task8/demo-data.
+TASK8_DIR = ROOT_DIR / "task8_insights_analytics"
+task8_router = None
+
+if TASK8_DIR.exists():
+    if str(TASK8_DIR) not in sys.path:
+        sys.path.insert(0, str(TASK8_DIR))
+
+    from insights_api import router as task8_router  # noqa: E402
+
+
 app = FastAPI(
     title="Customer Simulator Agent",
     version="2.0"
@@ -78,6 +110,14 @@ app = FastAPI(
 # its own: task4_task5_task6_support_assist_agents/run.py
 if task6_router is not None:
     app.include_router(task6_router)
+
+# Task 7 - Live Support Console endpoints (/task7/...)
+if task7_router is not None:
+    app.include_router(task7_router)
+
+# Task 8 - Post-Interaction Summary + Performance Analytics (/task8/...)
+if task8_router is not None:
+    app.include_router(task8_router)
 
 
 # ==========================================================

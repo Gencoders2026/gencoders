@@ -767,6 +767,11 @@ function SupportConsole() {
             <span className="session-id">
               Session: {sessionId}
             </span>
+            <button onClick={() => navigate("/task6")}>
+              Task 6 - Escalation Risk Monitor
+            </button>
+
+
           </div>
         </header>
 
@@ -846,6 +851,11 @@ function SupportConsole() {
           <span className="session-id">
             Session: {session.session_id}
           </span>
+
+            <button onClick={() => navigate("/task6")}>
+              Task 6 - Escalation Risk Monitor
+            </button>
+
 
           <button onClick={handleEndSession}>
             End Session
@@ -1462,8 +1472,11 @@ function SupportConsole() {
 
                   <p className="risk-meta">
                     Trend: {analysis?.escalation_trend || "unknown"}{" "}
-                    · Turn {analysis?.turn ?? 1} · Negative
-                    streak: {analysis?.negative_streak ?? 0}
+                    · Turn {analysis?.turn ?? 1}
+                  </p>
+
+                  <p className="risk-meta">
+                    Negative Streak: {analysis?.negative_streak ?? 0}
                   </p>
 
                   {analysis?.escalation_indicators?.length > 0 && (

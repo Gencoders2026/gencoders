@@ -18,6 +18,22 @@ function Dashboard() {
             Dashboard
           </button>
 
+          <button onClick={() => navigate("/task7")}>
+            Task 7 - Live Support Console
+          </button>
+
+          <button onClick={() => navigate("/task8")}>
+            Task 8 - Performance Analytics
+          </button>
+
+          <button onClick={() => navigate("/task8/summary")}>
+            Task 8 - Summary Report
+          </button>
+
+          <button onClick={() => navigate("/task6")}>
+            Task 6 - Escalation Risk Monitor
+          </button>
+
           <button onClick={() => navigate("/analytics")}>
             Analytics
           </button>
