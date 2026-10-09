@@ -411,7 +411,610 @@
         "is_demo": true,
         "note": "Realistic demo conversation used to populate the performance-analytics dashboard. Labelled as demo data everywhere it is displayed."
       }
+    },
+    {
+      "id": "conv-7aca159690",
+      "mode": "replay",
+      "title": "Replay - TC17_replay.txt",
+      "persona": null,
+      "scenario": "payment_failure",
+      "source_file": "TC17_replay.txt",
+      "is_demo": false,
+      "tags": [],
+      "messages": [
+        {
+          "role": "customer",
+          "content": "My payment failed and I have been trying for two hours.",
+          "timestamp": null,
+          "turn": 1
+        },
+        {
+          "role": "agent",
+          "content": "I'm sorry for the inconvenience. I'll check the payment status for you.",
+          "timestamp": null,
+          "turn": 2
+        },
+        {
+          "role": "customer",
+          "content": "I still see the duplicate charge on my statement.",
+          "timestamp": null,
+          "turn": 3
+        },
+        {
+          "role": "agent",
+          "content": "I understand your concern. I'll check the duplicate transaction and help with the refund.",
+          "timestamp": null,
+          "turn": 4
+        },
+        {
+          "role": "customer",
+          "content": "Please resolve this as soon as possible.",
+          "timestamp": null,
+          "turn": 5
+        },
+        {
+          "role": "agent",
+          "content": "I'll review the transaction details and help resolve the issue as quickly as possible.",
+          "timestamp": null,
+          "turn": 6
+        }
+      ],
+      "knowledge_searches": [
+        {
+          "turn": 1,
+          "query": "My payment failed and I have been trying for two hours.",
+          "results": 3,
+          "sources": [
+            "payment_issues.txt",
+            "payment_issues.txt",
+            "payment_issues.txt"
+          ]
+        },
+        {
+          "turn": 2,
+          "query": "I still see the duplicate charge on my statement.",
+          "results": 3,
+          "sources": [
+            "payment_issues.txt",
+            "Refund Policy.pdf",
+            "payment_issues.txt"
+          ]
+        },
+        {
+          "turn": 3,
+          "query": "Please resolve this as soon as possible.",
+          "results": 0,
+          "sources": []
+        }
+      ],
+      "meta": {
+        "escalation_timeline": [
+          {
+            "label": "#1",
+            "value": 0,
+            "level": "Low",
+            "frustration": 3,
+            "sentiment": "neutral",
+            "intent": "payment_failure",
+            "message": "My payment failed and I have been trying for two hours."
+          },
+          {
+            "label": "#2",
+            "value": 39,
+            "level": "Medium",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "general_inquiry",
+            "message": "I still see the duplicate charge on my statement."
+          },
+          {
+            "label": "#3",
+            "value": 39,
+            "level": "Medium",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "general_inquiry",
+            "message": "Please resolve this as soon as possible."
+          }
+        ],
+        "summary": {
+          "totalMessages": 6,
+          "customerMessages": 3,
+          "agentMessages": 3,
+          "peakRisk": 39,
+          "peakLevel": "Medium",
+          "startRisk": 0,
+          "endRisk": 39,
+          "firstSentiment": "neutral",
+          "lastSentiment": "negative",
+          "firstFrustration": 3,
+          "lastFrustration": 7,
+          "intents": [
+            "payment_failure",
+            "general_inquiry"
+          ],
+          "hasAnalysis": true
+        },
+        "transcript_format": "txt",
+        "transcript_warnings": []
+      },
+      "created_at": "2026-10-02T05:45:58+00:00"
+    },
+    {
+      "id": "conv-7c7e542f70",
+      "mode": "replay",
+      "title": "Replay - Simulator session 56b7913a – delayed_order",
+      "persona": null,
+      "scenario": "delayed_order",
+      "source_file": "Simulator session 56b7913a – delayed_order",
+      "is_demo": false,
+      "tags": [],
+      "messages": [
+        {
+          "role": "customer",
+          "content": "I'm getting frustrated with this delay. I need a concrete delivery update.",
+          "timestamp": null,
+          "turn": 1
+        },
+        {
+          "role": "agent",
+          "content": "I'm really sorry about this experience. You're right to be upset, and I'm going to take care of this personally right now. Would you like me to look up the current delivery status of your order and walk you through the available options? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 2
+        },
+        {
+          "role": "customer",
+          "content": "This is still frustrating. I appreciate the apology, but I still need a real update on the delivery.",
+          "timestamp": null,
+          "turn": 3
+        },
+        {
+          "role": "agent",
+          "content": "I'm really sorry about this experience. You're right to be upset, and I'm going to take care of this personally right now. Would you like me to look up the current delivery status of your order and walk you through the available options? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 4
+        },
+        {
+          "role": "customer",
+          "content": "I'm not happy about this. My order number is 784213. It was supposed to arrive three days ago.",
+          "timestamp": null,
+          "turn": 5
+        },
+        {
+          "role": "agent",
+          "content": "I'm really sorry about this experience. You're right to be upset, and I'm going to take care of this personally right now. Could you share a bit more detail (for example your order ID) so I can pull up the exact information and help you from there? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 6
+        },
+        {
+          "role": "customer",
+          "content": "This is still frustrating. Of course. The order reference is DEL-55219, shipped on the 3rd.",
+          "timestamp": null,
+          "turn": 7
+        },
+        {
+          "role": "agent",
+          "content": "I'm really sorry about this experience. You're right to be upset, and I'm going to take care of this personally right now. Could you share a bit more detail (for example your order ID) so I can pull up the exact information and help you from there? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 8
+        },
+        {
+          "role": "customer",
+          "content": "I'm not happy about this. Sure - tracking number 0034 8891 2210, and the courier never updated it.",
+          "timestamp": null,
+          "turn": 9
+        }
+      ],
+      "knowledge_searches": [
+        {
+          "turn": 1,
+          "query": "I'm getting frustrated with this delay. I need a concrete delivery update.",
+          "results": 0,
+          "sources": []
+        },
+        {
+          "turn": 2,
+          "query": "This is still frustrating. I appreciate the apology, but I still need a real update on the delivery.",
+          "results": 1,
+          "sources": [
+            "Refund Policy.pdf"
+          ]
+        },
+        {
+          "turn": 3,
+          "query": "I'm not happy about this. My order number is 784213. It was supposed to arrive three days ago.",
+          "results": 0,
+          "sources": []
+        },
+        {
+          "turn": 4,
+          "query": "This is still frustrating. Of course. The order reference is DEL-55219, shipped on the 3rd.",
+          "results": 0,
+          "sources": []
+        },
+        {
+          "turn": 5,
+          "query": "I'm not happy about this. Sure - tracking number 0034 8891 2210, and the courier never updated it.",
+          "results": 1,
+          "sources": [
+            "Refund Policy.pdf"
+          ]
+        }
+      ],
+      "meta": {
+        "escalation_timeline": [
+          {
+            "label": "#1",
+            "value": 39,
+            "level": "Medium",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "delayed_order",
+            "message": "I'm getting frustrated with this delay. I need a concrete delivery update."
+          },
+          {
+            "label": "#2",
+            "value": 44,
+            "level": "Medium",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "delayed_order",
+            "message": "This is still frustrating. I appreciate the apology, but I still need a real update on the delivery."
+          },
+          {
+            "label": "#3",
+            "value": 44,
+            "level": "Medium",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "general_inquiry",
+            "message": "I'm not happy about this. My order number is 784213. It was supposed to arrive three days ago."
+          },
+          {
+            "label": "#4",
+            "value": 54,
+            "level": "High",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "general_inquiry",
+            "message": "This is still frustrating. Of course. The order reference is DEL-55219, shipped on the 3rd."
+          },
+          {
+            "label": "#5",
+            "value": 54,
+            "level": "High",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "delayed_order",
+            "message": "I'm not happy about this. Sure - tracking number 0034 8891 2210, and the courier never updated it."
+          }
+        ],
+        "summary": {
+          "totalMessages": 9,
+          "customerMessages": 5,
+          "agentMessages": 4,
+          "peakRisk": 54,
+          "peakLevel": "High",
+          "startRisk": 39,
+          "endRisk": 54,
+          "firstSentiment": "negative",
+          "lastSentiment": "negative",
+          "firstFrustration": 7,
+          "lastFrustration": 7,
+          "intents": [
+            "delayed_order",
+            "general_inquiry"
+          ],
+          "hasAnalysis": true
+        },
+        "transcript_format": "simulator",
+        "transcript_warnings": []
+      },
+      "created_at": "2026-10-02T05:48:26+00:00"
+    },
+    {
+      "id": "conv-da2e79c3cd",
+      "mode": "replay",
+      "title": "Replay - Simulator session 80387b58 – delayed_order",
+      "persona": null,
+      "scenario": "delayed_order",
+      "source_file": "Simulator session 80387b58 – delayed_order",
+      "is_demo": false,
+      "tags": [],
+      "messages": [
+        {
+          "role": "customer",
+          "content": "I'm getting frustrated with this delay. I need a concrete delivery update.",
+          "timestamp": null,
+          "turn": 1
+        },
+        {
+          "role": "agent",
+          "content": "I'm really sorry about this experience. You're right to be upset, and I'm going to take care of this personally right now. Would you like me to look up the current delivery status of your order and walk you through the available options? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 2
+        },
+        {
+          "role": "customer",
+          "content": "I appreciate the apology, but I still need a real update on the delivery.",
+          "timestamp": null,
+          "turn": 3
+        },
+        {
+          "role": "agent",
+          "content": "I'm really sorry about this experience. You're right to be upset, and I'm going to take care of this personally right now. Would you like me to look up the current delivery status of your order and walk you through the available options? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 4
+        },
+        {
+          "role": "customer",
+          "content": "My order number is 784213. It was supposed to arrive three days ago.",
+          "timestamp": null,
+          "turn": 5
+        },
+        {
+          "role": "agent",
+          "content": "I'm sorry for the inconvenience — I completely understand how frustrating this is, and I'll sort it out for you now. Could you share a bit more detail (for example your order ID) so I can pull up the exact information and help you from there? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 6
+        },
+        {
+          "role": "customer",
+          "content": "I'm starting to get concerned. Of course. The order reference is DEL-55219, shipped on the 3rd.",
+          "timestamp": null,
+          "turn": 7
+        },
+        {
+          "role": "agent",
+          "content": "I'm really sorry about this experience. You're right to be upset, and I'm going to take care of this personally right now. Could you share a bit more detail (for example your order ID) so I can pull up the exact information and help you from there? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 8
+        },
+        {
+          "role": "customer",
+          "content": "This is becoming worrying. Sure - tracking number 0034 8891 2210, and the courier never updated it.",
+          "timestamp": null,
+          "turn": 9
+        },
+        {
+          "role": "agent",
+          "content": "I'm really sorry about this experience. You're right to be upset, and I'm going to take care of this personally right now. Would you like me to look up the current delivery status of your order and walk you through the available options? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 10
+        },
+        {
+          "role": "customer",
+          "content": "I'm starting to get concerned. Thank you for apologising. Could you actually check the delivery status for me?",
+          "timestamp": null,
+          "turn": 11
+        },
+        {
+          "role": "agent",
+          "content": "I'm really sorry about this experience. You're right to be upset, and I'm going to take care of this personally right now. Would you like me to look up the current delivery status of your order and walk you through the available options? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 12
+        },
+        {
+          "role": "customer",
+          "content": "I'm beginning to lose patience. It's order 90147. The delivery page has not changed since I placed it.",
+          "timestamp": null,
+          "turn": 13
+        },
+        {
+          "role": "agent",
+          "content": "I'm really sorry about this experience. You're right to be upset, and I'm going to take care of this personally right now. Would you like me to look up the current delivery status of your order and walk you through the available options? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 14
+        },
+        {
+          "role": "customer",
+          "content": "This is becoming worrying. Yes, that is correct. Please proceed with the next step.",
+          "timestamp": null,
+          "turn": 15
+        },
+        {
+          "role": "agent",
+          "content": "I'm really sorry about this experience. You're right to be upset, and I'm going to take care of this personally right now. Could you share a bit more detail (for example your order ID) so I can pull up the exact information and help you from there? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 16
+        },
+        {
+          "role": "customer",
+          "content": "I'm starting to get concerned. Thank you for the update. I appreciate you checking for me.",
+          "timestamp": null,
+          "turn": 17
+        },
+        {
+          "role": "agent",
+          "content": "I'm really sorry about this experience. You're right to be upset, and I'm going to take care of this personally right now. Could you share a bit more detail (for example your order ID) so I can pull up the exact information and help you from there? Thank you for your patience — is there anything else I can help you with while I'm here?",
+          "timestamp": null,
+          "turn": 18
+        },
+        {
+          "role": "customer",
+          "content": "I'm beginning to lose patience. I understand there can be delays. Could you share the current tracking status?",
+          "timestamp": null,
+          "turn": 19
+        }
+      ],
+      "knowledge_searches": [
+        {
+          "turn": 1,
+          "query": "I'm getting frustrated with this delay. I need a concrete delivery update.",
+          "results": 0,
+          "sources": []
+        },
+        {
+          "turn": 2,
+          "query": "I appreciate the apology, but I still need a real update on the delivery.",
+          "results": 0,
+          "sources": []
+        },
+        {
+          "turn": 3,
+          "query": "My order number is 784213. It was supposed to arrive three days ago.",
+          "results": 0,
+          "sources": []
+        },
+        {
+          "turn": 4,
+          "query": "I'm starting to get concerned. Of course. The order reference is DEL-55219, shipped on the 3rd.",
+          "results": 0,
+          "sources": []
+        },
+        {
+          "turn": 5,
+          "query": "This is becoming worrying. Sure - tracking number 0034 8891 2210, and the courier never updated it.",
+          "results": 0,
+          "sources": []
+        },
+        {
+          "turn": 6,
+          "query": "I'm starting to get concerned. Thank you for apologising. Could you actually check the delivery status for me?",
+          "results": 0,
+          "sources": []
+        },
+        {
+          "turn": 7,
+          "query": "I'm beginning to lose patience. It's order 90147. The delivery page has not changed since I placed it.",
+          "results": 0,
+          "sources": []
+        },
+        {
+          "turn": 8,
+          "query": "This is becoming worrying. Yes, that is correct. Please proceed with the next step.",
+          "results": 0,
+          "sources": []
+        },
+        {
+          "turn": 9,
+          "query": "I'm starting to get concerned. Thank you for the update. I appreciate you checking for me.",
+          "results": 0,
+          "sources": []
+        },
+        {
+          "turn": 10,
+          "query": "I'm beginning to lose patience. I understand there can be delays. Could you share the current tracking status?",
+          "results": 0,
+          "sources": []
+        }
+      ],
+      "meta": {
+        "escalation_timeline": [
+          {
+            "label": "#1",
+            "value": 10,
+            "level": "Low",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "delayed_order",
+            "message": "I'm getting frustrated with this delay. I need a concrete delivery update."
+          },
+          {
+            "label": "#2",
+            "value": 39,
+            "level": "Medium",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "delayed_order",
+            "message": "I appreciate the apology, but I still need a real update on the delivery."
+          },
+          {
+            "label": "#3",
+            "value": 30,
+            "level": "Medium",
+            "frustration": 6,
+            "sentiment": "neutral",
+            "intent": "general_inquiry",
+            "message": "My order number is 784213. It was supposed to arrive three days ago."
+          },
+          {
+            "label": "#4",
+            "value": 30,
+            "level": "Medium",
+            "frustration": 6,
+            "sentiment": "negative",
+            "intent": "general_inquiry",
+            "message": "I'm starting to get concerned. Of course. The order reference is DEL-55219, shipped on the 3rd."
+          },
+          {
+            "label": "#5",
+            "value": 41,
+            "level": "Medium",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "delayed_order",
+            "message": "This is becoming worrying. Sure - tracking number 0034 8891 2210, and the courier never updated it."
+          },
+          {
+            "label": "#6",
+            "value": 43,
+            "level": "Medium",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "delayed_order",
+            "message": "I'm starting to get concerned. Thank you for apologising. Could you actually check the delivery status for me?"
+          },
+          {
+            "label": "#7",
+            "value": 46,
+            "level": "Medium",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "delayed_order",
+            "message": "I'm beginning to lose patience. It's order 90147. The delivery page has not changed since I placed it."
+          },
+          {
+            "label": "#8",
+            "value": 42,
+            "level": "Medium",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "general_inquiry",
+            "message": "This is becoming worrying. Yes, that is correct. Please proceed with the next step."
+          },
+          {
+            "label": "#9",
+            "value": 40,
+            "level": "Medium",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "general_inquiry",
+            "message": "I'm starting to get concerned. Thank you for the update. I appreciate you checking for me."
+          },
+          {
+            "label": "#10",
+            "value": 48,
+            "level": "Medium",
+            "frustration": 7,
+            "sentiment": "negative",
+            "intent": "delayed_order",
+            "message": "I'm beginning to lose patience. I understand there can be delays. Could you share the current tracking status?"
+          }
+        ],
+        "summary": {
+          "totalMessages": 19,
+          "customerMessages": 10,
+          "agentMessages": 9,
+          "peakRisk": 48,
+          "peakLevel": "Medium",
+          "startRisk": 10,
+          "endRisk": 48,
+          "firstSentiment": "negative",
+          "lastSentiment": "negative",
+          "firstFrustration": 7,
+          "lastFrustration": 7,
+          "intents": [
+            "delayed_order",
+            "general_inquiry"
+          ],
+          "hasAnalysis": true
+        },
+        "transcript_format": "simulator",
+        "transcript_warnings": []
+      },
+      "created_at": "2026-10-02T06:37:53+00:00"
     }
   ],
-  "updated_at": "2026-10-01T01:18:37+00:00"
+  "updated_at": "2026-10-08T15:25:30+00:00"
 }
